@@ -1,0 +1,23 @@
+{
+  "name": "amase",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Autonomous Multi-Agent SDLC Engine — control plane over AI models for SDLC execution.",
+  "packageManager": "pnpm@9.0.0",
+  "engines": { "node": ">=20.11" },
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "mcp": "pnpm --filter @amase/mcp-server start",
+    "cli": "pnpm --filter @amase/cli start"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}

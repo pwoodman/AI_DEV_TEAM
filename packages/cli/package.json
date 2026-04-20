@@ -1,0 +1,22 @@
+{
+  "name": "@amase/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": { "amase": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node ./dist/index.js"
+  },
+  "dependencies": {
+    "@amase/agents": "workspace:*",
+    "@amase/contracts": "workspace:*",
+    "@amase/core": "workspace:*",
+    "@amase/llm": "workspace:*",
+    "@amase/memory": "workspace:*",
+    "@amase/validators": "workspace:*"
+  }
+}

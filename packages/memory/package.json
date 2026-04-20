@@ -1,0 +1,19 @@
+{
+  "name": "@amase/memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@amase/contracts": "workspace:*",
+    "ts-morph": "^23.0.0",
+    "@lancedb/lancedb": "^0.10.0"
+  }
+}
