@@ -1,0 +1,1 @@
+Add a Zod schema named `UserSchema` exporting fields `id: string (uuid)` and `email: string (email)` to `src/user.ts`. Export the inferred type `User`. Add one vitest at `src/user.test.ts` asserting a valid object parses and an invalid one throws.

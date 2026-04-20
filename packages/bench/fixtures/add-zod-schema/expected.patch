@@ -1,0 +1,55 @@
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..02f1f05
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,9 @@
++{
++  "name": "fx-add-zod-schema",
++  "version": "0.0.0",
++  "private": true,
++  "type": "module",
++  "scripts": { "test": "vitest run" },
++  "dependencies": { "zod": "^3.23.0" },
++  "devDependencies": { "vitest": "^2.1.0", "typescript": "^5.6.0" }
++}
+diff --git a/src/.gitkeep b/src/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/src/user.test.ts b/src/user.test.ts
+new file mode 100644
+index 0000000..7deae27
+--- /dev/null
++++ b/src/user.test.ts
+@@ -0,0 +1,12 @@
++import { describe, expect, it } from "vitest";
++import { UserSchema, type User } from "./user.js";
++
++describe("UserSchema", () => {
++  it("accepts a valid user", () => {
++    const u: User = { id: "11111111-1111-1111-1111-111111111111", email: "a@b.co" };
++    expect(UserSchema.parse(u)).toEqual(u);
++  });
++  it("rejects invalid email", () => {
++    expect(() => UserSchema.parse({ id: "11111111-1111-1111-1111-111111111111", email: "nope" })).toThrow();
++  });
++});
+diff --git a/src/user.ts b/src/user.ts
+new file mode 100644
+index 0000000..799cd45
+--- /dev/null
++++ b/src/user.ts
+@@ -0,0 +1,6 @@
++import { z } from "zod";
++export const UserSchema = z.object({
++  id: z.string().uuid(),
++  email: z.string().email(),
++});
++export type User = z.infer<typeof UserSchema>;
+diff --git a/tsconfig.json b/tsconfig.json
+new file mode 100644
+index 0000000..52d77f9
+--- /dev/null
++++ b/tsconfig.json
+@@ -0,0 +1 @@
++{ "compilerOptions": { "target": "ES2022", "module": "ESNext", "moduleResolution": "bundler", "strict": true, "esModuleInterop": true } }

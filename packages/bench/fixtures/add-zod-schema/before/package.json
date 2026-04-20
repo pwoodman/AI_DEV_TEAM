@@ -1,0 +1,9 @@
+{
+  "name": "fx-add-zod-schema",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "vitest run" },
+  "dependencies": { "zod": "^3.23.0" },
+  "devDependencies": { "vitest": "^2.1.0", "typescript": "^5.6.0" }
+}
