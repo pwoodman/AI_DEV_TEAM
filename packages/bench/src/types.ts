@@ -17,3 +17,8 @@ export const BenchResultSchema = z.object({
   error: z.string().optional(),
 });
 export type BenchResult = z.infer<typeof BenchResultSchema>;
+
+export interface RunOpts {
+  runId: string;
+  live?: boolean;
+}
