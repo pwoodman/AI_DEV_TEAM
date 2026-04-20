@@ -36,6 +36,30 @@ importers:
         specifier: ^3.23.0
         version: 3.25.76
 
+  packages/bench:
+    dependencies:
+      '@amase/agents':
+        specifier: workspace:*
+        version: link:../agents
+      '@amase/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@amase/core':
+        specifier: workspace:*
+        version: link:../core
+      '@amase/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@amase/memory':
+        specifier: workspace:*
+        version: link:../memory
+      '@amase/validators':
+        specifier: workspace:*
+        version: link:../validators
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+
   packages/cli:
     dependencies:
       '@amase/agents':
