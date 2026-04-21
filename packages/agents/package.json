@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@amase/ambiguity": "workspace:*",
     "@amase/contracts": "workspace:*",
     "@amase/llm": "workspace:*",
     "@amase/skills": "workspace:*",

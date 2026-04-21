@@ -28,6 +28,15 @@ to reading all files when it is absent.
 
 Instead of a normal `patches` response, emit one patch: `op: "create"`, `path: ".amase/task-graph.json"`, `content: <JSON-stringified TaskGraph>`.
 
+Ambiguity surfacing (optional): You MAY also emit a top-level `decisions` array, one entry per nontrivial engineering choice you made or punted. Each entry is a `DecisionDraft` with:
+- `kind`: one of `module-layout | data-model | dependency | api-surface | logic | other`
+- `summary`: short sentence
+- `touchedPaths`: string[]
+- `fileCount`: number
+- optional flags: `addsDependency` (string), `changesPublicApi`, `changesDataModel`, `crossesModuleBoundary` (bool), `crossCuttingConcern` (`auth|logging|errors|i18n|none`)
+
+The orchestrator rubric-scores these and may loop back to ask the user. Omit the array entirely if all choices are trivial.
+
 The TaskGraph JSON shape:
 ```json
 {

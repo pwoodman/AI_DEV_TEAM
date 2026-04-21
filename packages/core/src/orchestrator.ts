@@ -10,7 +10,7 @@ import {
   type UserAnswer,
   type UserQuestion,
 } from "@amase/contracts";
-import type { BaseAgent } from "@amase/agents";
+import type { BaseAgent, ArchitectAgent } from "@amase/agents";
 import type { AgentKind } from "@amase/contracts";
 import { type ASTIndex, DAGStore, DecisionLog, runPaths } from "@amase/memory";
 import { resolveSkills } from "@amase/skills";
@@ -159,6 +159,29 @@ export class Orchestrator {
     graph.dagId = dagId;
     graph.workspacePath = req.workspacePath;
     graph.createdAt = new Date().toISOString();
+
+    if (output.decisions && output.decisions.length > 0) {
+      const architectAgent = this.deps.agents.architect as ArchitectAgent;
+      const { questions } = await architectAgent.resolve(output.decisions, dagId);
+      const log = this.deps.makeDecisionLog(paths.decisions);
+      for (const q of questions) {
+        this.enqueueQuestion(q);
+        await log.append({
+          ts: new Date().toISOString(),
+          dagId,
+          runId: dagId,
+          nodeId: "<architect>",
+          event: "architect.question",
+          data: {
+            questionId: q.questionId,
+            question: q.question,
+            options: q.options,
+            recommended: q.recommended,
+            reason: q.reason,
+          },
+        });
+      }
+    }
 
     await this.deps.store.put(graph, paths.dagSnapshot);
     return { dagId, graph };
