@@ -82,7 +82,9 @@ describe("MCP stdio roundtrip", () => {
     const res = await client.request("tools/list");
     const names = res.tools.map((t: { name: string }) => t.name).sort();
     expect(names).toEqual([
+      "amase_answer",
       "amase_artifacts",
+      "amase_clarify",
       "amase_execute",
       "amase_plan",
       "amase_skills",

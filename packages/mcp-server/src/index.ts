@@ -19,6 +19,7 @@ import type { AgentKind, Language } from "@amase/contracts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { registerQuestionTools } from "./question-tools.js";
 
 function buildLlm(): LlmClient {
   if (process.env.AMASE_LLM_STUB === "1") {
@@ -234,6 +235,8 @@ server.tool(
     return { content: [{ type: "text", text: JSON.stringify({ skills }, null, 2) }] };
   },
 );
+
+registerQuestionTools(server, orchestrator);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

@@ -7,6 +7,8 @@ import {
   type Patch,
   type TaskGraph,
   type TaskNode,
+  type UserAnswer,
+  type UserQuestion,
 } from "@amase/contracts";
 import type { BaseAgent } from "@amase/agents";
 import type { AgentKind } from "@amase/contracts";
@@ -80,7 +82,57 @@ export interface PlanResult {
 }
 
 export class Orchestrator {
+  private pendingQuestions: Map<string, UserQuestion[]> = new Map();
+  private answers: Map<string, Map<string, UserAnswer>> = new Map();
+  private answerResolvers: Map<string, (ans: UserAnswer) => void> = new Map();
+
   constructor(private deps: OrchestratorDeps) {}
+
+  enqueueQuestion(q: UserQuestion): void {
+    const list = this.pendingQuestions.get(q.runId) ?? [];
+    list.push(q);
+    this.pendingQuestions.set(q.runId, list);
+  }
+
+  pendingQuestion(runId: string): UserQuestion | null {
+    const list = this.pendingQuestions.get(runId);
+    if (!list || list.length === 0) return null;
+    const runAnswers = this.answers.get(runId);
+    for (const q of list) {
+      if (!runAnswers || !runAnswers.has(q.questionId)) {
+        return q;
+      }
+    }
+    return null;
+  }
+
+  async answerQuestion(ans: UserAnswer): Promise<void> {
+    let runAnswers = this.answers.get(ans.runId);
+    if (!runAnswers) {
+      runAnswers = new Map();
+      this.answers.set(ans.runId, runAnswers);
+    }
+    runAnswers.set(ans.questionId, ans);
+    const list = this.pendingQuestions.get(ans.runId);
+    if (list) {
+      const idx = list.findIndex((q) => q.questionId === ans.questionId);
+      if (idx >= 0) list.splice(idx, 1);
+      if (list.length === 0) this.pendingQuestions.delete(ans.runId);
+    }
+    const resolver = this.answerResolvers.get(ans.questionId);
+    if (resolver) {
+      this.answerResolvers.delete(ans.questionId);
+      resolver(ans);
+    }
+  }
+
+  waitForAnswer(runId: string, questionId: string): Promise<UserAnswer> {
+    const existing = this.answers.get(runId)?.get(questionId);
+    if (existing) return Promise.resolve(existing);
+    return new Promise<UserAnswer>((resolve) => {
+      this.answerResolvers.set(questionId, resolve);
+    });
+  }
 
   async plan(req: FeatureRequest): Promise<PlanResult> {
     const dagId = randomUUID();
