@@ -5,11 +5,14 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": { "amase-mcp": "./dist/index.js" },
+  "bin": {
+    "amase-mcp": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:fuzz": "node -e \"process.env.AMASE_FUZZ='1';require('child_process').execSync('vitest run tests/fuzz',{stdio:'inherit',env:process.env})\"",
     "start": "node ./dist/index.js"
   },
   "dependencies": {
@@ -22,5 +25,8 @@
     "@amase/validators": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "fast-check": "^4.7.0"
   }
 }

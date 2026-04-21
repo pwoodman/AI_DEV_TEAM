@@ -8,6 +8,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",
+    "test:fuzz": "pnpm --filter @amase/mcp-server test:fuzz",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "pnpm -r typecheck",
