@@ -12,6 +12,12 @@ import {
 import type { LlmCallResult, LlmClient } from "@amase/llm";
 import { renderTemplate } from "@amase/llm";
 import { getSkill } from "@amase/skills";
+import {
+  patchSafetyValidator,
+  schemaValidator,
+  type ValidatorContext,
+} from "@amase/validators";
+import { selfCorrect } from "./self-correct.js";
 
 export interface AgentMetrics {
   taskId: string;
@@ -155,23 +161,55 @@ export abstract class BaseAgent {
     }
 
     const start = Date.now();
-    const res: LlmCallResult = await this.llm.call({
-      system,
-      user,
-      maxTokens: validated.constraints.maxTokens,
+    let accTokensIn = 0;
+    let accTokensOut = 0;
+    let lastModel = "";
+    let parseErrorFeedback: string | undefined;
+
+    const produce = async (feedback?: string): Promise<AgentOutput> => {
+      const effectiveUser = feedback
+        ? `${user}\n\n// NOTE: previous draft failed validation:\n// ${feedback}\n// emit a corrected JSON draft only`
+        : user;
+      const res: LlmCallResult = await this.llm.call({
+        system,
+        user: effectiveUser,
+        maxTokens: validated.constraints.maxTokens,
+      });
+      accTokensIn += res.tokensIn;
+      accTokensOut += res.tokensOut;
+      lastModel = res.model;
+      try {
+        return this.parseOutput(res.text, validated.taskId);
+      } catch (e) {
+        // On the retry pass, propagate so run() throws.
+        if (feedback !== undefined) throw e;
+        // First pass parse failure: record feedback and re-invoke once.
+        parseErrorFeedback = `parse error: ${(e as Error).message}`;
+        return produce(parseErrorFeedback);
+      }
+    };
+
+    const ctx: ValidatorContext = {
+      workspacePath: workspace ?? process.cwd(),
+      allowedPaths: validated.constraints.allowedPaths,
+      touchesFrontend: false,
+    };
+    const output = await selfCorrect({
+      produce,
+      validators: [schemaValidator, patchSafetyValidator],
+      ctx,
     });
     const durationMs = Date.now() - start;
 
-    const output = this.parseOutput(res.text, validated.taskId);
     return {
       output,
       metrics: {
         taskId: validated.taskId,
         kind: this.kind,
-        tokensIn: res.tokensIn,
-        tokensOut: res.tokensOut,
+        tokensIn: accTokensIn,
+        tokensOut: accTokensOut,
         durationMs,
-        model: res.model,
+        model: lastModel,
       },
     };
   }

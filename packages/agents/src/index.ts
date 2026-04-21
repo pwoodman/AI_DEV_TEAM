@@ -1,5 +1,6 @@
 export * from "./base-agent.js";
 export * from "./registry.js";
+export * from "./self-correct.js";
 export { ArchitectAgent } from "./architect.js";
 export { BackendAgent } from "./backend.js";
 export { FrontendAgent } from "./frontend.js";

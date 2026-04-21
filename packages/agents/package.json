@@ -17,6 +17,7 @@
     "@amase/llm": "workspace:*",
     "@amase/memory": "workspace:*",
     "@amase/skills": "workspace:*",
+    "@amase/validators": "workspace:*",
     "zod": "^3.23.0"
   }
 }
