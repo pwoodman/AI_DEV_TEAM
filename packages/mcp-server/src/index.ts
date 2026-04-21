@@ -32,7 +32,11 @@ function buildStubLlm(): LlmClient {
     if (process.env.AMASE_STUB_FIXTURE) {
       return await readFile(process.env.AMASE_STUB_FIXTURE, "utf8");
     }
-    const isArchitect = req.system.includes("Architect Agent");
+    const systemText =
+      typeof req.system === "string"
+        ? req.system
+        : req.system.map((b) => b.text).join("\n");
+    const isArchitect = systemText.includes("Architect Agent");
     if (isArchitect) {
       const workspacePath = req.user.match(/"workspacePath":\s*"([^"]*)"/)?.[1] ?? ".";
       return JSON.stringify({

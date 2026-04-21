@@ -72,8 +72,12 @@ function synthesizePatch(before: Map<string, string>, after: Map<string, string>
  * fix — pass=false is expected at Task 3 scope.
  */
 function buildStubResponder(workspacePath: string, prompt: string) {
-  return (req: { system: string; user: string }) => {
-    const isArchitect = req.system.includes("Architect Agent");
+  return (req: { system: string | { text: string }[]; user: string }) => {
+    const systemText =
+      typeof req.system === "string"
+        ? req.system
+        : req.system.map((b) => b.text).join("\n");
+    const isArchitect = systemText.includes("Architect Agent");
     if (isArchitect) {
       const graph = {
         dagId: "will-be-overwritten",
