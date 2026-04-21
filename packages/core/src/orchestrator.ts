@@ -12,7 +12,14 @@ import {
 } from "@amase/contracts";
 import type { BaseAgent, ArchitectAgent } from "@amase/agents";
 import type { AgentKind } from "@amase/contracts";
-import { type ASTIndex, DAGStore, DecisionLog, runPaths } from "@amase/memory";
+import {
+  type ASTIndex,
+  DAGStore,
+  DecisionLog,
+  runPaths,
+  touchedPathsSignature,
+  type LoggedDecision,
+} from "@amase/memory";
 import { resolveSkills } from "@amase/skills";
 import {
   buildDeploymentReadinessGate,
@@ -85,6 +92,13 @@ export class Orchestrator {
   private pendingQuestions: Map<string, UserQuestion[]> = new Map();
   private answers: Map<string, Map<string, UserAnswer>> = new Map();
   private answerResolvers: Map<string, (ans: UserAnswer) => void> = new Map();
+  private decisionCache: Map<string, LoggedDecision[]> = new Map();
+  private pendingDecisionContext: Map<string, {
+    workspacePath: string;
+    dagId: string;
+    draft: import("@amase/contracts").DecisionDraft;
+    decisionsPath: string;
+  }> = new Map();
 
   constructor(private deps: OrchestratorDeps) {}
 
@@ -119,11 +133,91 @@ export class Orchestrator {
       if (idx >= 0) list.splice(idx, 1);
       if (list.length === 0) this.pendingQuestions.delete(ans.runId);
     }
+    const ctx = this.pendingDecisionContext.get(ans.questionId);
+    if (ctx) {
+      const entry: LoggedDecision = {
+        id: ans.questionId,
+        kind: ctx.draft.kind,
+        signature: touchedPathsSignature(ctx.draft),
+        answer: { choice: ans.choice },
+      };
+      const cache = this.decisionCache.get(ctx.workspacePath) ?? [];
+      cache.push(entry);
+      this.decisionCache.set(ctx.workspacePath, cache);
+      try {
+        const log = this.deps.makeDecisionLog(ctx.decisionsPath);
+        await log.append({
+          ts: new Date().toISOString(),
+          dagId: ctx.dagId,
+          runId: ans.runId,
+          nodeId: "<architect>",
+          event: "user.answer",
+          data: {
+            questionId: ans.questionId,
+            choice: ans.choice,
+            kind: ctx.draft.kind,
+            signature: entry.signature,
+          },
+        });
+      } catch {
+        // best-effort logging
+      }
+      this.pendingDecisionContext.delete(ans.questionId);
+    }
     const resolver = this.answerResolvers.get(ans.questionId);
     if (resolver) {
       this.answerResolvers.delete(ans.questionId);
       resolver(ans);
     }
+  }
+
+  private async loadDecisionCache(workspacePath: string): Promise<LoggedDecision[]> {
+    const cached = this.decisionCache.get(workspacePath);
+    if (cached) return cached;
+    const out: LoggedDecision[] = [];
+    try {
+      const runsRoot = join(workspacePath, ".amase", "runs");
+      const runDirs = await readdir(runsRoot);
+      for (const runDir of runDirs) {
+        try {
+          const decisionsPath = join(runsRoot, runDir, "decisions.jsonl");
+          const log = this.deps.makeDecisionLog(decisionsPath);
+          const entries = await log.readAll();
+          const questionsById = new Map<string, { kind: string; signature: string[] }>();
+          for (const e of entries) {
+            if (e.event === "architect.question") {
+              const qid = e.data.questionId as string | undefined;
+              const kind = e.data.kind as string | undefined;
+              const signature = e.data.signature as string[] | undefined;
+              if (qid && kind && Array.isArray(signature)) {
+                questionsById.set(qid, { kind, signature });
+              }
+            } else if (e.event === "user.answer") {
+              const qid = e.data.questionId as string | undefined;
+              const choice = e.data.choice as 0 | 1 | 2 | undefined;
+              const kind = (e.data.kind as string | undefined)
+                ?? (qid ? questionsById.get(qid)?.kind : undefined);
+              const signature = (e.data.signature as string[] | undefined)
+                ?? (qid ? questionsById.get(qid)?.signature : undefined);
+              if (qid && kind && Array.isArray(signature) && (choice === 0 || choice === 1 || choice === 2)) {
+                out.push({
+                  id: qid,
+                  kind: kind as LoggedDecision["kind"],
+                  signature,
+                  answer: { choice },
+                });
+              }
+            }
+          }
+        } catch {
+          // ignore bad run dirs
+        }
+      }
+    } catch {
+      // no runs dir yet
+    }
+    this.decisionCache.set(workspacePath, out);
+    return out;
   }
 
   waitForAnswer(runId: string, questionId: string): Promise<UserAnswer> {
@@ -162,9 +256,36 @@ export class Orchestrator {
 
     if (output.decisions && output.decisions.length > 0) {
       const architectAgent = this.deps.agents.architect as ArchitectAgent;
-      const { questions } = await architectAgent.resolve(output.decisions, dagId);
+      const reuseLog = await this.loadDecisionCache(req.workspacePath);
+      const { questions } = await architectAgent.resolve(output.decisions, dagId, reuseLog);
       const log = this.deps.makeDecisionLog(paths.decisions);
+      const draftsByIndex = output.decisions;
+      let draftCursor = 0;
       for (const q of questions) {
+        // find the first remaining draft whose reuse lookup would miss; that's this question's draft.
+        // simple heuristic: advance cursor and pick the next unmatched draft.
+        let draft = draftsByIndex[draftCursor];
+        while (draft) {
+          const sig = touchedPathsSignature(draft);
+          const alreadyResolved = reuseLog.some(
+            (e) =>
+              e.kind === draft!.kind &&
+              e.signature.length === sig.length &&
+              e.signature.every((s, i) => s === sig[i]),
+          );
+          if (!alreadyResolved) break;
+          draftCursor += 1;
+          draft = draftsByIndex[draftCursor];
+        }
+        if (draft) {
+          this.pendingDecisionContext.set(q.questionId, {
+            workspacePath: req.workspacePath,
+            dagId,
+            draft,
+            decisionsPath: paths.decisions,
+          });
+          draftCursor += 1;
+        }
         this.enqueueQuestion(q);
         await log.append({
           ts: new Date().toISOString(),
@@ -178,6 +299,8 @@ export class Orchestrator {
             options: q.options,
             recommended: q.recommended,
             reason: q.reason,
+            kind: draft?.kind,
+            signature: draft ? touchedPathsSignature(draft) : [],
           },
         });
       }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { scoreDecision, classifyDecision, type DecisionDraft } from "@amase/ambiguity";
 import { buildCachedSystem, type LlmClient } from "@amase/llm";
 import type { UserQuestion } from "@amase/contracts";
+import { findReusableDecision, type LoggedDecision } from "@amase/memory";
 import { BaseAgent } from "./base-agent.js";
 
 const QGEN_SYSTEM = `Generate exactly 3 distinct options to resolve the engineering decision.
@@ -63,10 +64,18 @@ export class ArchitectAgent extends BaseAgent {
   async resolve(
     decisions: DecisionDraft[],
     runId: string,
+    reuseLog?: LoggedDecision[],
   ): Promise<{ resolved: DecisionDraft[]; questions: UserQuestion[] }> {
     const questions: UserQuestion[] = [];
     const resolved: DecisionDraft[] = [];
     for (const d of decisions) {
+      if (reuseLog) {
+        const hit = findReusableDecision(reuseLog, d);
+        if (hit) {
+          resolved.push(d);
+          continue;
+        }
+      }
       const r = scoreDecision(d);
       if (r.decision === "decide") {
         resolved.push(d);

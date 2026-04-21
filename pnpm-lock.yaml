@@ -32,6 +32,9 @@ importers:
       '@amase/llm':
         specifier: workspace:*
         version: link:../llm
+      '@amase/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@amase/skills':
         specifier: workspace:*
         version: link:../skills

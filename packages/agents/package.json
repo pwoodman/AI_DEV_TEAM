@@ -15,6 +15,7 @@
     "@amase/ambiguity": "workspace:*",
     "@amase/contracts": "workspace:*",
     "@amase/llm": "workspace:*",
+    "@amase/memory": "workspace:*",
     "@amase/skills": "workspace:*",
     "zod": "^3.23.0"
   }
