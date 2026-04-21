@@ -1,0 +1,20 @@
+diff --git a/src/time.ts b/src/time.ts
+--- a/src/time.ts
++++ b/src/time.ts
+@@ -1,11 +1,13 @@
++export const SECONDS_PER_DAY = 86400;
++
+ export function daysToSeconds(days: number): number {
+-  return days * 86400;
++  return days * SECONDS_PER_DAY;
+ }
+
+ export function secondsToDays(seconds: number): number {
+-  return seconds / 86400;
++  return seconds / SECONDS_PER_DAY;
+ }
+
+ export function isMoreThanADay(seconds: number): boolean {
+-  return seconds > 86400;
++  return seconds > SECONDS_PER_DAY;
+ }

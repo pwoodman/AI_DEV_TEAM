@@ -1,0 +1,1 @@
+Add a `--json` flag to the CLI in `src/cli.ts`. The exported `run(args: string[]): string` function currently returns a plain line like `"name=alice age=30"`. When `--json` appears anywhere in `args`, it should instead return a JSON string like `'{"name":"alice","age":30}'` (use `JSON.stringify`). Without the flag, output must be unchanged.

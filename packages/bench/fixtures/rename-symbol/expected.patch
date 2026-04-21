@@ -1,0 +1,30 @@
+diff --git a/src/totals.ts b/src/totals.ts
+--- a/src/totals.ts
++++ b/src/totals.ts
+@@ -1,3 +1,3 @@
+-export function calcTotal(items: number[]): number {
++export function calculateTotal(items: number[]): number {
+   return items.reduce((a, b) => a + b, 0);
+ }
+diff --git a/src/cart.ts b/src/cart.ts
+--- a/src/cart.ts
++++ b/src/cart.ts
+@@ -1,5 +1,5 @@
+-import { calcTotal } from "./totals.js";
++import { calculateTotal } from "./totals.js";
+
+ export function cartTotal(prices: number[]): number {
+-  return calcTotal(prices);
++  return calculateTotal(prices);
+ }
+diff --git a/src/report.ts b/src/report.ts
+--- a/src/report.ts
++++ b/src/report.ts
+@@ -1,5 +1,5 @@
+-import { calcTotal } from "./totals.js";
++import { calculateTotal } from "./totals.js";
+
+ export function reportLine(label: string, values: number[]): string {
+-  return `${label}: ${calcTotal(values)}`;
++  return `${label}: ${calculateTotal(values)}`;
+ }

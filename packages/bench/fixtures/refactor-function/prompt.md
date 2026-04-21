@@ -1,0 +1,1 @@
+Both `printInvoice` and `printReceipt` in `src/format.ts` contain the same block that formats a currency amount as `"$" + n.toFixed(2)`. Extract that logic into a new exported helper `formatCurrency(n: number): string` in the same file, and replace both inline usages with a call to it. Do not change the external behavior of either function.

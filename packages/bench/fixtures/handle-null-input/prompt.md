@@ -1,0 +1,1 @@
+The function `sumList` in `src/sumList.ts` crashes when called with `null` or `undefined`. Add a guard at the start so that if `items` is `null` or `undefined`, the function returns `0`. Change the parameter type to `number[] | null | undefined`. Do not change behavior for non-null inputs.

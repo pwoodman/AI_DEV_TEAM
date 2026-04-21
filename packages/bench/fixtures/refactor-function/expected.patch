@@ -1,0 +1,17 @@
+diff --git a/src/format.ts b/src/format.ts
+--- a/src/format.ts
++++ b/src/format.ts
+@@ -1,7 +1,11 @@
++export function formatCurrency(n: number): string {
++  return "$" + n.toFixed(2);
++}
++
+ export function printInvoice(amount: number): string {
+-  return "Invoice: " + "$" + amount.toFixed(2);
++  return "Invoice: " + formatCurrency(amount);
+ }
+
+ export function printReceipt(amount: number): string {
+-  return "Receipt: " + "$" + amount.toFixed(2);
++  return "Receipt: " + formatCurrency(amount);
+ }

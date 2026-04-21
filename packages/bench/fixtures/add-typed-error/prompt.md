@@ -1,0 +1,1 @@
+In `src/validate.ts`, the `validateAge` function currently throws a generic `Error` when the age is negative. Define and export a new class `ValidationError extends Error` (set `this.name = "ValidationError"` in its constructor) in the same file, and change `validateAge` to throw a `ValidationError` instead of a plain `Error`. Keep the thrown message unchanged.

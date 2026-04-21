@@ -1,0 +1,18 @@
+diff --git a/src/validate.ts b/src/validate.ts
+--- a/src/validate.ts
++++ b/src/validate.ts
+@@ -1,6 +1,13 @@
++export class ValidationError extends Error {
++  constructor(message: string) {
++    super(message);
++    this.name = "ValidationError";
++  }
++}
++
+ export function validateAge(age: number): number {
+   if (age < 0) {
+-    throw new Error("age must be non-negative");
++    throw new ValidationError("age must be non-negative");
+   }
+   return age;
+ }

@@ -1,0 +1,1 @@
+The magic number `86400` appears three times in `src/time.ts`. Extract it into a top-level exported constant named `SECONDS_PER_DAY` (declared with `export const SECONDS_PER_DAY = 86400;`) and replace every occurrence of the literal `86400` in this file with the constant. Do not change behavior.
