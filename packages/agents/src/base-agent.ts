@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   type AgentInput,
@@ -7,6 +7,7 @@ import {
   type AgentKind,
   type AgentOutput,
   AgentOutputSchema,
+  type ContextSlice,
 } from "@amase/contracts";
 import type { LlmCallResult, LlmClient } from "@amase/llm";
 import { renderTemplate } from "@amase/llm";
@@ -26,13 +27,24 @@ export interface AgentRunResult {
   metrics: AgentMetrics;
 }
 
+/**
+ * Minimal structural type we need from an AST index. Defined here to avoid
+ * a package dependency from @amase/agents onto @amase/memory.
+ */
+export interface ASTIndexLike {
+  getSlice(path: string, symbolName: string): Promise<string | undefined>;
+}
+
 const PROMPTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "prompts");
 
 export abstract class BaseAgent {
   abstract readonly kind: AgentKind;
   abstract readonly promptFile: string;
 
-  constructor(protected llm: LlmClient) {}
+  constructor(
+    protected llm: LlmClient,
+    protected astIndex?: ASTIndexLike,
+  ) {}
 
   protected async loadPrompt(): Promise<string> {
     return await readFile(join(PROMPTS_DIR, this.promptFile), "utf8");
@@ -73,8 +85,66 @@ export abstract class BaseAgent {
     return `\n\n## Applicable skills\n\nApply these practices when producing patches:\n\n${parts.join("\n\n")}\n`;
   }
 
-  async run(input: AgentInput): Promise<AgentRunResult> {
+  /**
+   * Resolve a ContextSlice (requested by the architect/orchestrator) into
+   * concrete `{path, slice}` file entries by reading files and/or extracting
+   * AST symbol slices. Symbols that cannot be resolved are skipped silently
+   * (so a single bad ref doesn't break the run).
+   *
+   * If no workspace is provided, paths are assumed to already be absolute or
+   * relative to the current process cwd.
+   */
+  protected async buildContextFromSlice(
+    slice: ContextSlice,
+    workspace?: string,
+  ): Promise<Array<{ path: string; slice: string }>> {
+    const out: Array<{ path: string; slice: string }> = [];
+    const toAbs = (p: string): string =>
+      isAbsolute(p) || !workspace ? p : join(workspace, p);
+
+    if (slice.files && slice.files.length > 0) {
+      for (const rel of slice.files) {
+        try {
+          const content = await readFile(toAbs(rel), "utf8");
+          out.push({ path: rel, slice: content });
+        } catch {
+          // skip unreadable files
+        }
+      }
+    }
+
+    if (slice.symbols && slice.symbols.length > 0) {
+      for (const sym of slice.symbols) {
+        if (!this.astIndex) break; // no AST index available, skip symbols
+        try {
+          const text = await this.astIndex.getSlice(toAbs(sym.path), sym.name);
+          if (text !== undefined) {
+            out.push({ path: `${sym.path}#${sym.name}`, slice: text });
+          }
+        } catch {
+          // unresolvable symbol, skip silently
+        }
+      }
+    }
+
+    return out;
+  }
+
+  async run(input: AgentInput, workspace?: string): Promise<AgentRunResult> {
     const validated = AgentInputSchema.parse(input);
+
+    // If caller supplied a contextSlice, resolve it into context.files
+    // (replacing whatever the caller might have populated by naive walk).
+    if (validated.contextSlice) {
+      const resolved = await this.buildContextFromSlice(
+        validated.contextSlice,
+        workspace,
+      );
+      if (resolved.length > 0) {
+        validated.context = { ...validated.context, files: resolved };
+      }
+    }
+
     const template = await this.loadPrompt();
     const base = renderTemplate(template, { kind: this.kind });
     const skillsBlock = await this.loadSkillsBlock(validated.skills);

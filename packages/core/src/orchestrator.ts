@@ -10,7 +10,7 @@ import {
 } from "@amase/contracts";
 import type { BaseAgent } from "@amase/agents";
 import type { AgentKind } from "@amase/contracts";
-import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
+import { type ASTIndex, DAGStore, DecisionLog, runPaths } from "@amase/memory";
 import { resolveSkills } from "@amase/skills";
 import {
   buildDeploymentReadinessGate,
@@ -71,6 +71,7 @@ export interface OrchestratorDeps {
   makeDecisionLog: (path: string) => DecisionLog;
   maxRetriesPerNode?: number;
   deploymentReadiness?: boolean;
+  astIndex?: ASTIndex;
 }
 
 export interface PlanResult {
@@ -162,12 +163,18 @@ export class Orchestrator {
           data: { retries, lastFailureMessage },
         });
 
-        const files = await buildContextFiles(paths.workspace, ["."]);
+        const hasSlice = !!node.contextSlice
+          && ((node.contextSlice.symbols?.length ?? 0) > 0
+            || (node.contextSlice.files?.length ?? 0) > 0);
+        const files = hasSlice
+          ? []
+          : await buildContextFiles(paths.workspace, ["."]);
         const input: AgentInput = {
           taskId: `${dagId}:${node.id}:${retries}`,
           kind: route,
           goal: node.goal,
           context: { files, diff: lastFailureMessage },
+          ...(hasSlice ? { contextSlice: node.contextSlice } : {}),
           constraints: {
             maxTokens: 4096,
             timeoutMs: 60_000,
@@ -180,7 +187,7 @@ export class Orchestrator {
         let output: Awaited<ReturnType<typeof agent.run>>["output"];
         let metrics: Awaited<ReturnType<typeof agent.run>>["metrics"];
         try {
-          ({ output, metrics } = await agent.run(input));
+          ({ output, metrics } = await agent.run(input, paths.workspace));
         } catch (err) {
           const message = (err as Error).message ?? String(err);
           await log.append({

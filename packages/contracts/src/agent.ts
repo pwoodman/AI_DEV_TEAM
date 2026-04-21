@@ -20,11 +20,24 @@ export const ContextEnvelopeSchema = z.object({
 });
 export type ContextEnvelope = z.infer<typeof ContextEnvelopeSchema>;
 
+export const ContextSliceSymbolSchema = z.object({
+  path: z.string().min(1),
+  name: z.string().min(1),
+});
+export type ContextSliceSymbol = z.infer<typeof ContextSliceSymbolSchema>;
+
+export const ContextSliceSchema = z.object({
+  symbols: z.array(ContextSliceSymbolSchema).optional(),
+  files: z.array(z.string()).optional(),
+});
+export type ContextSlice = z.infer<typeof ContextSliceSchema>;
+
 export const AgentInputSchema = z.object({
   taskId: z.string().min(1),
   kind: AgentKindSchema,
   goal: z.string().min(1),
   context: ContextEnvelopeSchema,
+  contextSlice: ContextSliceSchema.optional(),
   constraints: z.object({
     maxTokens: z.number().int().positive(),
     timeoutMs: z.number().int().positive(),

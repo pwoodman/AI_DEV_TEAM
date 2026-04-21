@@ -12,6 +12,14 @@ export const TaskStatusSchema = z.enum([
 ]);
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
+export const TaskNodeContextSliceSchema = z.object({
+  symbols: z
+    .array(z.object({ path: z.string().min(1), name: z.string().min(1) }))
+    .optional(),
+  files: z.array(z.string()).optional(),
+});
+export type TaskNodeContextSlice = z.infer<typeof TaskNodeContextSliceSchema>;
+
 export const TaskNodeSchema = z.object({
   id: z.string().min(1),
   kind: AgentKindSchema,
@@ -22,6 +30,7 @@ export const TaskNodeSchema = z.object({
   retries: z.number().int().nonnegative().optional(),
   skills: z.array(z.string()).optional(),
   language: LanguageSchema.optional(),
+  contextSlice: TaskNodeContextSliceSchema.optional(),
 });
 export type TaskNode = z.infer<typeof TaskNodeSchema>;
 
