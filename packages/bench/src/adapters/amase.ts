@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { buildAgentRegistry } from "@amase/agents";
@@ -6,6 +6,7 @@ import { Orchestrator } from "@amase/core";
 import { StubLlmClient } from "@amase/llm";
 import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
 import { patchSafetyValidator, schemaValidator } from "@amase/validators";
+import { diffSimilarity as computeDiffSimilarity } from "../diff-similarity.js";
 import type { Fixture } from "../fixtures.js";
 import type { BenchResult, RunOpts } from "../types.js";
 
@@ -15,6 +16,53 @@ async function materializeTree(dest: string, tree: Map<string, string>): Promise
     await mkdir(dirname(abs), { recursive: true });
     await writeFile(abs, content);
   }
+}
+
+async function readTreeFromDisk(
+  root: string,
+  acc = new Map<string, string>(),
+  rel = "",
+): Promise<Map<string, string>> {
+  let entries: Array<{ name: string; isDirectory(): boolean; isFile(): boolean }>;
+  try {
+    entries = (await readdir(join(root, rel), { withFileTypes: true })) as unknown as Array<{
+      name: string;
+      isDirectory(): boolean;
+      isFile(): boolean;
+    }>;
+  } catch {
+    return acc;
+  }
+  for (const e of entries) {
+    const relPath = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) await readTreeFromDisk(root, acc, relPath);
+    else if (e.isFile()) {
+      try {
+        acc.set(relPath, await readFile(join(root, relPath), "utf8"));
+      } catch {
+        // skip unreadable (binary, permissions, etc.)
+      }
+    }
+  }
+  return acc;
+}
+
+/**
+ * Build a synthetic unified-diff-ish string by walking both trees and
+ * concatenating `path + before + after` for every file in either tree.
+ * Jaccard doesn't care about real diff format; this gives a dependency-free,
+ * deterministic observed patch.
+ */
+function synthesizePatch(before: Map<string, string>, after: Map<string, string>): string {
+  const paths = new Set<string>([...before.keys(), ...after.keys()]);
+  const sorted = [...paths].sort();
+  const chunks: string[] = [];
+  for (const p of sorted) {
+    chunks.push(p);
+    chunks.push(before.get(p) ?? "");
+    chunks.push(after.get(p) ?? "");
+  }
+  return chunks.join("\n");
 }
 
 /**
@@ -123,8 +171,16 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
 
     const wallMs = Date.now() - start;
 
-    // Task 3 scope: no real diff similarity. Report 1.0 on pass, 0.0 on fail.
-    const diffSimilarity = pass ? 1.0 : 0.0;
+    // Task 4: compute real diff similarity via Jaccard over a synthetic
+    // "path + before + after" concatenation of both trees, compared against
+    // the fixture's expected.patch.
+    let diffSimilarity = 0;
+    if (dagId) {
+      const sandbox = runPaths(workspace, dagId).workspace;
+      const afterTree = await readTreeFromDisk(sandbox);
+      const observedPatch = synthesizePatch(fx.beforeTree, afterTree);
+      diffSimilarity = computeDiffSimilarity(observedPatch, fx.expectedPatch);
+    }
 
     return {
       runId: opts.runId,
