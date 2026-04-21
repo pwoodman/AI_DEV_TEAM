@@ -2,10 +2,7 @@ import type { Orchestrator } from "@amase/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-export function registerQuestionTools(
-  server: McpServer,
-  orchestrator: Orchestrator,
-): void {
+export function registerQuestionTools(server: McpServer, orchestrator: Orchestrator): void {
   server.tool(
     "amase_clarify",
     "Fetch the next pending user-input question for a run, or null if none.",

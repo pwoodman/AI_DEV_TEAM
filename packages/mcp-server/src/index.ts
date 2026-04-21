@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { buildAgentRegistry } from "@amase/agents";
+import type { AgentKind, Language } from "@amase/contracts";
 import { Orchestrator } from "@amase/core";
 import { AnthropicClient, type LlmClient, StubLlmClient } from "@amase/llm";
 import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
+import { ALL_SKILLS, resolveSkills } from "@amase/skills";
 import {
+  type Validator,
   buildSecurityValidator,
   lintValidator,
   patchSafetyValidator,
@@ -12,10 +15,7 @@ import {
   typecheckValidator,
   uiTestsValidator,
   unitTestsValidator,
-  type Validator,
 } from "@amase/validators";
-import { ALL_SKILLS, resolveSkills } from "@amase/skills";
-import type { AgentKind, Language } from "@amase/contracts";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
@@ -34,9 +34,7 @@ function buildStubLlm(): LlmClient {
       return await readFile(process.env.AMASE_STUB_FIXTURE, "utf8");
     }
     const systemText =
-      typeof req.system === "string"
-        ? req.system
-        : req.system.map((b) => b.text).join("\n");
+      typeof req.system === "string" ? req.system : req.system.map((b) => b.text).join("\n");
     const isArchitect = systemText.includes("Architect Agent");
     if (isArchitect) {
       const workspacePath = req.user.match(/"workspacePath":\s*"([^"]*)"/)?.[1] ?? ".";
@@ -114,9 +112,7 @@ server.tool(
   async ({ request, workspacePath }) => {
     const { dagId, graph } = await orchestrator.plan({ request, workspacePath });
     return {
-      content: [
-        { type: "text", text: JSON.stringify({ dagId, nodes: graph.nodes }, null, 2) },
-      ],
+      content: [{ type: "text", text: JSON.stringify({ dagId, nodes: graph.nodes }, null, 2) }],
     };
   },
 );

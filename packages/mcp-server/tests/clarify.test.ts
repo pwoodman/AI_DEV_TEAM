@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
 import { Orchestrator } from "@amase/core";
 import { DAGStore, DecisionLog } from "@amase/memory";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { describe, expect, it } from "vitest";
 import { registerQuestionTools } from "../src/question-tools.js";
 
 describe("registerQuestionTools", () => {
@@ -21,12 +21,8 @@ describe("registerQuestionTools", () => {
       ...rest: unknown[]
     ) => {
       registered.push(name);
-      return (originalTool as unknown as (...args: unknown[]) => unknown)(
-        name,
-        ...rest,
-      );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any;
+      return (originalTool as unknown as (...args: unknown[]) => unknown)(name, ...rest);
+    }) as unknown as typeof server.tool;
 
     registerQuestionTools(server, orchestrator);
 
