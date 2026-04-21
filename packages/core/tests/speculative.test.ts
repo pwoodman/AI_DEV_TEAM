@@ -2,9 +2,9 @@ import { EventEmitter } from "node:events";
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 import type { TaskGraph, TaskNode } from "@amase/contracts";
 import { DAGStore } from "@amase/memory";
+import { describe, expect, it } from "vitest";
 import { isBlockedByQuestion, runScheduler } from "../src/index.js";
 
 describe("isBlockedByQuestion", () => {
@@ -84,7 +84,13 @@ describe("scheduler speculative execution", () => {
           decisionId: "q1",
         },
         { id: "n2", kind: "backend", goal: "unblocked", dependsOn: [], allowedPaths: ["src/"] },
-        { id: "n3", kind: "backend", goal: "depends on n2", dependsOn: ["n2"], allowedPaths: ["src/"] },
+        {
+          id: "n3",
+          kind: "backend",
+          goal: "depends on n2",
+          dependsOn: ["n2"],
+          allowedPaths: ["src/"],
+        },
       ],
     };
     const dir = await mkdtemp(join(tmpdir(), "spec-"));
@@ -115,7 +121,9 @@ describe("scheduler speculative execution", () => {
 
     // Give scheduler time to run n2 and n3 while n1 stays blocked.
     await new Promise((r) => setTimeout(r, 80));
-    const snapshot1 = store.get("spec1")!;
+    const snapshot1 = store.get("spec1");
+    expect(snapshot1).toBeDefined();
+    if (!snapshot1) throw new Error("missing DAG snapshot spec1");
     expect(snapshot1.nodes.find((n) => n.id === "n2")?.status).toBe("completed");
     expect(snapshot1.nodes.find((n) => n.id === "n3")?.status).toBe("completed");
     expect(snapshot1.nodes.find((n) => n.id === "n1")?.status).toBeUndefined();
@@ -126,7 +134,9 @@ describe("scheduler speculative execution", () => {
 
     await schedulerDone;
 
-    const final = store.get("spec1")!;
+    const final = store.get("spec1");
+    expect(final).toBeDefined();
+    if (!final) throw new Error("missing final DAG snapshot spec1");
     expect(final.nodes.find((n) => n.id === "n1")?.status).toBe("completed");
     expect(runOrder).toContain("n1");
     // n1 should have been last (it waited)

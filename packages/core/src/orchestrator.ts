@@ -1,35 +1,36 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readFile, stat, readdir } from "node:fs/promises";
+import type { Stats } from "node:fs";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
-import {
-  type AgentInput,
-  type FeatureRequest,
-  type Patch,
-  type TaskGraph,
-  type TaskNode,
-  type UserAnswer,
-  type UserQuestion,
+import type { ArchitectAgent, BaseAgent } from "@amase/agents";
+import type {
+  AgentInput,
+  FeatureRequest,
+  Patch,
+  TaskGraph,
+  TaskNode,
+  UserAnswer,
+  UserQuestion,
 } from "@amase/contracts";
-import type { BaseAgent, ArchitectAgent } from "@amase/agents";
 import type { AgentKind } from "@amase/contracts";
 import {
   type ASTIndex,
-  DAGStore,
-  DecisionLog,
+  type DAGStore,
+  type DecisionLog,
+  type LoggedDecision,
   runPaths,
   touchedPathsSignature,
-  type LoggedDecision,
 } from "@amase/memory";
 import { resolveSkills } from "@amase/skills";
 import {
-  buildDeploymentReadinessGate,
-  buildSkillChecksValidator,
   type Validator,
   type ValidatorContext,
+  buildDeploymentReadinessGate,
+  buildSkillChecksValidator,
   runValidatorChain,
 } from "@amase/validators";
-import { routeNode, type RouterOptions } from "./router.js";
+import { type RouterOptions, routeNode } from "./router.js";
 import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
 import { isBlockedByQuestion } from "./speculative.js";
@@ -45,7 +46,7 @@ async function buildContextFiles(
   let total = 0;
   const visit = async (rel: string): Promise<void> => {
     const abs = join(workspace, rel);
-    let s;
+    let s: Stats;
     try {
       s = await stat(abs);
     } catch {
@@ -95,12 +96,15 @@ export class Orchestrator {
   private answers: Map<string, Map<string, UserAnswer>> = new Map();
   private answerResolvers: Map<string, (ans: UserAnswer) => void> = new Map();
   private decisionCache: Map<string, LoggedDecision[]> = new Map();
-  private pendingDecisionContext: Map<string, {
-    workspacePath: string;
-    dagId: string;
-    draft: import("@amase/contracts").DecisionDraft;
-    decisionsPath: string;
-  }> = new Map();
+  private pendingDecisionContext: Map<
+    string,
+    {
+      workspacePath: string;
+      dagId: string;
+      draft: import("@amase/contracts").DecisionDraft;
+      decisionsPath: string;
+    }
+  > = new Map();
   private blockedDecisionsByRun: Map<string, Set<string>> = new Map();
   private blockedChangedByRun: Map<string, EventEmitter> = new Map();
 
@@ -213,11 +217,18 @@ export class Orchestrator {
             } else if (e.event === "user.answer") {
               const qid = e.data.questionId as string | undefined;
               const choice = e.data.choice as 0 | 1 | 2 | undefined;
-              const kind = (e.data.kind as string | undefined)
-                ?? (qid ? questionsById.get(qid)?.kind : undefined);
-              const signature = (e.data.signature as string[] | undefined)
-                ?? (qid ? questionsById.get(qid)?.signature : undefined);
-              if (qid && kind && Array.isArray(signature) && (choice === 0 || choice === 1 || choice === 2)) {
+              const kind =
+                (e.data.kind as string | undefined) ??
+                (qid ? questionsById.get(qid)?.kind : undefined);
+              const signature =
+                (e.data.signature as string[] | undefined) ??
+                (qid ? questionsById.get(qid)?.signature : undefined);
+              if (
+                qid &&
+                kind &&
+                Array.isArray(signature) &&
+                (choice === 0 || choice === 1 || choice === 2)
+              ) {
                 out.push({
                   id: qid,
                   kind: kind as LoggedDecision["kind"],
@@ -287,7 +298,7 @@ export class Orchestrator {
           const sig = touchedPathsSignature(draft);
           const alreadyResolved = reuseLog.some(
             (e) =>
-              e.kind === draft!.kind &&
+              e.kind === draft?.kind &&
               e.signature.length === sig.length &&
               e.signature.every((s, i) => s === sig[i]),
           );
@@ -352,9 +363,14 @@ export class Orchestrator {
       }
 
       const agent = this.deps.agents[route];
-      const resolvedSkills = (node.skills && node.skills.length > 0)
-        ? node.skills
-        : resolveSkills({ kind: route, language: node.language, touchedPaths: node.allowedPaths }).map((s) => s.id);
+      const resolvedSkills =
+        node.skills && node.skills.length > 0
+          ? node.skills
+          : resolveSkills({
+              kind: route,
+              language: node.language,
+              touchedPaths: node.allowedPaths,
+            }).map((s) => s.id);
       let retries = 0;
       let lastFailureMessage: string | undefined;
 
@@ -379,12 +395,11 @@ export class Orchestrator {
           data: { retries, lastFailureMessage },
         });
 
-        const hasSlice = !!node.contextSlice
-          && ((node.contextSlice.symbols?.length ?? 0) > 0
-            || (node.contextSlice.files?.length ?? 0) > 0);
-        const files = hasSlice
-          ? []
-          : await buildContextFiles(paths.workspace, ["."]);
+        const hasSlice =
+          !!node.contextSlice &&
+          ((node.contextSlice.symbols?.length ?? 0) > 0 ||
+            (node.contextSlice.files?.length ?? 0) > 0);
+        const files = hasSlice ? [] : await buildContextFiles(paths.workspace, ["."]);
         const input: AgentInput = {
           taskId: `${dagId}:${node.id}:${retries}`,
           kind: route,
@@ -464,7 +479,14 @@ export class Orchestrator {
             runId,
             nodeId: node.id,
             event: "node.completed",
-            data: { retries, patches: output.patches.map((p) => ({ path: p.path, op: p.op, bytes: p.content.length })) },
+            data: {
+              retries,
+              patches: output.patches.map((p) => ({
+                path: p.path,
+                op: p.op,
+                bytes: p.content.length,
+              })),
+            },
           });
           return "completed";
         }

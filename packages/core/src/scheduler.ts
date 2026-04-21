@@ -1,17 +1,26 @@
-import { EventEmitter } from "node:events";
-import type { TaskNode } from "@amase/contracts";
+import type { EventEmitter } from "node:events";
+import { cpus } from "node:os";
+import type { AgentKind, TaskNode } from "@amase/contracts";
 import type { DAGStore } from "@amase/memory";
 
 export type NodeExecutor = (node: TaskNode) => Promise<"completed" | "failed" | "skipped">;
 
+export type PoolName = "agent" | "validator";
+
+export interface SchedulerPools {
+  agent: number;
+  validator: number;
+}
+
 export interface SchedulerOptions {
+  /** Unified cap. If set alongside `pools`, `pools` wins for per-pool caps and
+   *  `concurrency` is ignored. Kept for backward compatibility. */
   concurrency?: number;
-  /** Optional predicate that returns true if `node` is currently blocked by an
-   *  unanswered decision. Blocked nodes are skipped from the ready set (not failed)
-   *  and picked up again once `blockedChanged` signals a state change. */
+  /** Split concurrency caps. Agent-bound nodes (LLM calls) and validator-bound
+   *  nodes (local CPU) compete for different resources and should not starve
+   *  each other. Defaults: agent=4 (Anthropic rate limits), validator=max(2,cpus). */
+  pools?: SchedulerPools;
   isBlocked?: (node: TaskNode) => boolean;
-  /** Event emitter that the orchestrator nudges (`emit("change")`) when the
-   *  underlying blocked-decisions state changes (e.g. after answering a question). */
   blockedChanged?: EventEmitter;
 }
 
@@ -21,6 +30,17 @@ interface InFlight {
   done: boolean;
 }
 
+const VALIDATOR_KINDS: ReadonlySet<AgentKind> = new Set<AgentKind>([
+  "qa",
+  "ui-test",
+  "security",
+  "deployment",
+]);
+
+export function classifyNode(node: TaskNode): PoolName {
+  return VALIDATOR_KINDS.has(node.kind) ? "validator" : "agent";
+}
+
 export async function runScheduler(
   dagId: string,
   store: DAGStore,
@@ -28,22 +48,33 @@ export async function runScheduler(
   concurrencyOrOpts: number | SchedulerOptions = 8,
 ): Promise<void> {
   const opts: SchedulerOptions =
-    typeof concurrencyOrOpts === "number"
-      ? { concurrency: concurrencyOrOpts }
-      : concurrencyOrOpts;
-  const concurrency = opts.concurrency ?? 8;
+    typeof concurrencyOrOpts === "number" ? { concurrency: concurrencyOrOpts } : concurrencyOrOpts;
+  const pools: SchedulerPools = opts.pools ?? {
+    agent: opts.concurrency ?? 4,
+    validator: opts.concurrency ?? Math.max(2, cpus().length),
+  };
   const isBlocked = opts.isBlocked;
   const blockedChanged = opts.blockedChanged;
 
-  const inFlight = new Map<string, InFlight>();
+  const inFlight: Record<PoolName, Map<string, InFlight>> = {
+    agent: new Map(),
+    validator: new Map(),
+  };
+  const allInFlight = (): InFlight[] => [
+    ...inFlight.agent.values(),
+    ...inFlight.validator.values(),
+  ];
+  const isAnywhereInFlight = (id: string): boolean =>
+    inFlight.agent.has(id) || inFlight.validator.has(id);
 
   while (true) {
-    const readyAll = store.readyNodes(dagId).filter((n) => !inFlight.has(n.id));
+    const readyAll = store.readyNodes(dagId).filter((n) => !isAnywhereInFlight(n.id));
     const ready = isBlocked ? readyAll.filter((n) => !isBlocked(n)) : readyAll;
     const skippedBlocked = isBlocked ? readyAll.filter((n) => isBlocked(n)) : [];
 
     for (const node of ready) {
-      if (inFlight.size >= concurrency) break;
+      const pool = classifyNode(node);
+      if (inFlight[pool].size >= pools[pool]) continue;
       const entry: InFlight = {
         id: node.id,
         done: false,
@@ -59,10 +90,11 @@ export async function runScheduler(
           entry.done = true;
         }),
       };
-      inFlight.set(node.id, entry);
+      inFlight[pool].set(node.id, entry);
     }
 
-    if (inFlight.size === 0) {
+    const flight = allInFlight();
+    if (flight.length === 0) {
       const graph = store.get(dagId);
       if (!graph) return;
       const allTerminal = graph.nodes.every((n) =>
@@ -70,8 +102,6 @@ export async function runScheduler(
       );
       if (allTerminal) return;
 
-      // If there are nodes that are ready-except-blocked, wait for a blocked-state change
-      // and re-poll. Otherwise remaining nodes are blocked by failed deps — terminate.
       if (skippedBlocked.length > 0 && blockedChanged) {
         await new Promise<void>((resolve) => {
           blockedChanged.once("change", () => resolve());
@@ -81,9 +111,11 @@ export async function runScheduler(
       return;
     }
 
-    await Promise.race(Array.from(inFlight.values()).map((e) => e.promise));
-    for (const [id, entry] of inFlight) {
-      if (entry.done) inFlight.delete(id);
+    await Promise.race(flight.map((e) => e.promise));
+    for (const pool of ["agent", "validator"] as const) {
+      for (const [id, entry] of inFlight[pool]) {
+        if (entry.done) inFlight[pool].delete(id);
+      }
     }
   }
 }

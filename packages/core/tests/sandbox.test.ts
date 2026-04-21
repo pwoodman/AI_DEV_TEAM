@@ -8,9 +8,7 @@ describe("applyPatches", () => {
   it("creates files including nested directories", async () => {
     const ws = await mkdtemp(join(tmpdir(), "sbx-"));
     await ensureSandbox(ws);
-    await applyPatches(ws, [
-      { path: "src/nested/a.ts", op: "create", content: "A" },
-    ]);
+    await applyPatches(ws, [{ path: "src/nested/a.ts", op: "create", content: "A" }]);
     expect(await readFile(join(ws, "src/nested/a.ts"), "utf8")).toBe("A");
   });
 

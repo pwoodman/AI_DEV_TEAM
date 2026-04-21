@@ -17,7 +17,8 @@ export function isBlockedByQuestion(
   const visited = new Set<string>();
   const stack: TaskNode[] = [node];
   while (stack.length) {
-    const n = stack.pop()!;
+    const n = stack.pop();
+    if (!n) continue;
     if (visited.has(n.id)) continue;
     visited.add(n.id);
     if (n.decisionId && blockedDecisions.has(n.decisionId)) return true;

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { UserQuestion } from "@amase/contracts";
 import { DAGStore, DecisionLog } from "@amase/memory";
+import { describe, expect, it } from "vitest";
 import { Orchestrator } from "../src/index.js";
 
 function makeOrchestrator(): Orchestrator {

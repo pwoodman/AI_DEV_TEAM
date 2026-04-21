@@ -42,20 +42,24 @@ export class AnthropicClient implements LlmClient {
       model,
       max_tokens: req.maxTokens,
       ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-      system: req.system as any,
+      system: req.system as unknown as string | SystemBlock[],
       messages: [{ role: "user", content: req.user }],
     });
     const text = res.content
       .filter((b): b is Anthropic.TextBlock => b.type === "text")
       .map((b) => b.text)
       .join("");
-    const usage = res.usage as any;
+    const usage = res.usage as unknown as Record<string, unknown>;
+    const cacheReadTokens =
+      typeof usage.cache_read_input_tokens === "number" ? usage.cache_read_input_tokens : 0;
+    const cacheWriteTokens =
+      typeof usage.cache_creation_input_tokens === "number" ? usage.cache_creation_input_tokens : 0;
     return {
       text,
       tokensIn: res.usage.input_tokens,
       tokensOut: res.usage.output_tokens,
-      cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
+      cacheReadTokens,
+      cacheWriteTokens,
       model,
       stopReason: res.stop_reason,
     };

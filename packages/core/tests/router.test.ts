@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { TaskNode } from "@amase/contracts";
+import { describe, expect, it } from "vitest";
 import { routeNode } from "../src/index.js";
 
 function node(kind: TaskNode["kind"]): TaskNode {
