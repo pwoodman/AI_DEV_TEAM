@@ -48,7 +48,7 @@ export type Patch = z.infer<typeof PatchSchema>;
 export const AgentOutputSchema = z.object({
   taskId: z.string().min(1),
   patches: z.array(PatchSchema),
-  notes: z.string().max(200),
+  notes: z.union([z.string(), z.array(z.string())]).transform((v) => (Array.isArray(v) ? v.join("; ") : v)).pipe(z.string().max(2000)),
   followups: z.array(TaskNodeSchema).optional(),
 });
 export type AgentOutput = z.infer<typeof AgentOutputSchema>;

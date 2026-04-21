@@ -80,6 +80,9 @@ export abstract class BaseAgent {
     const skillsBlock = await this.loadSkillsBlock(validated.skills);
     const system = base + skillsBlock;
     const user = this.buildUserMessage(validated);
+    if (process.env.AMASE_DEBUG_AGENT) {
+      console.error(`[agent:${this.kind}] USER MSG (${user.length}b):\n${user.slice(0, 2000)}`);
+    }
 
     const start = Date.now();
     const res: LlmCallResult = await this.llm.call({

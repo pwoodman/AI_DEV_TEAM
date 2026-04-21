@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { readFile, stat, readdir } from "node:fs/promises";
+import { join, relative } from "node:path";
 import {
   type AgentInput,
   type FeatureRequest,
@@ -18,8 +20,49 @@ import {
   runValidatorChain,
 } from "@amase/validators";
 import { routeNode, type RouterOptions } from "./router.js";
-import { applyPatches, ensureSandbox } from "./sandbox.js";
+import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
+
+const MAX_FILE_BYTES = 8_000;
+const MAX_TOTAL_BYTES = 24_000;
+
+async function buildContextFiles(
+  workspace: string,
+  allowedPaths: string[],
+): Promise<Array<{ path: string; slice: string }>> {
+  const out: Array<{ path: string; slice: string }> = [];
+  let total = 0;
+  const visit = async (rel: string): Promise<void> => {
+    const abs = join(workspace, rel);
+    let s;
+    try {
+      s = await stat(abs);
+    } catch {
+      return;
+    }
+    if (s.isDirectory()) {
+      const names = await readdir(abs);
+      for (const name of names) {
+        if (name === "node_modules" || name === ".amase" || name.startsWith(".git")) continue;
+        await visit(relative(workspace, join(abs, name)).replace(/\\/g, "/"));
+        if (total >= MAX_TOTAL_BYTES) return;
+      }
+      return;
+    }
+    if (!s.isFile()) return;
+    const content = await readFile(abs, "utf8").catch(() => "");
+    if (!content) return;
+    const slice = content.length > MAX_FILE_BYTES ? content.slice(0, MAX_FILE_BYTES) : content;
+    if (total + slice.length > MAX_TOTAL_BYTES) return;
+    total += slice.length;
+    out.push({ path: rel, slice });
+  };
+  for (const p of allowedPaths) {
+    if (total >= MAX_TOTAL_BYTES) break;
+    await visit(p);
+  }
+  return out;
+}
 
 export interface OrchestratorDeps {
   agents: Record<AgentKind, BaseAgent>;
@@ -42,6 +85,7 @@ export class Orchestrator {
     const dagId = randomUUID();
     const paths = runPaths(req.workspacePath, dagId);
     await ensureSandbox(paths.workspace);
+    await seedSandbox(req.workspacePath, paths.workspace);
 
     const architect = this.deps.agents.architect;
     const input: AgentInput = {
@@ -118,11 +162,12 @@ export class Orchestrator {
           data: { retries, lastFailureMessage },
         });
 
+        const files = await buildContextFiles(paths.workspace, ["."]);
         const input: AgentInput = {
           taskId: `${dagId}:${node.id}:${retries}`,
           kind: route,
           goal: node.goal,
-          context: { files: [], diff: lastFailureMessage },
+          context: { files, diff: lastFailureMessage },
           constraints: {
             maxTokens: 4096,
             timeoutMs: 60_000,
@@ -132,7 +177,24 @@ export class Orchestrator {
           language: node.language,
         };
 
-        const { output, metrics } = await agent.run(input);
+        let output: Awaited<ReturnType<typeof agent.run>>["output"];
+        let metrics: Awaited<ReturnType<typeof agent.run>>["metrics"];
+        try {
+          ({ output, metrics } = await agent.run(input));
+        } catch (err) {
+          const message = (err as Error).message ?? String(err);
+          await log.append({
+            ts: new Date().toISOString(),
+            dagId,
+            runId,
+            nodeId: node.id,
+            event: "agent.error",
+            data: { retries, message },
+          });
+          lastFailureMessage = `agent threw: ${message}`;
+          retries += 1;
+          continue;
+        }
         await log.append({
           ts: new Date().toISOString(),
           dagId,
@@ -179,7 +241,7 @@ export class Orchestrator {
             runId,
             nodeId: node.id,
             event: "node.completed",
-            data: { retries },
+            data: { retries, patches: output.patches.map((p) => ({ path: p.path, op: p.op, bytes: p.content.length })) },
           });
           return "completed";
         }

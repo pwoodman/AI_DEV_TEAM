@@ -44,6 +44,7 @@ export const DecisionLogEntrySchema = z.object({
     "llm.call",
     "skill.applied",
     "deployment.readiness",
+    "agent.error",
   ]),
   data: z.record(z.unknown()).default({}),
 });

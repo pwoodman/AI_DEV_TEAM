@@ -38,7 +38,7 @@ export class AnthropicClient implements LlmClient {
     const res = await this.client.messages.create({
       model,
       max_tokens: req.maxTokens,
-      temperature: req.temperature ?? 0,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       system: req.system,
       messages: [{ role: "user", content: req.user }],
     });
