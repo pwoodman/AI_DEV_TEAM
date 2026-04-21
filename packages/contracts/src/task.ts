@@ -31,6 +31,7 @@ export const TaskNodeSchema = z.object({
   skills: z.array(z.string()).optional(),
   language: LanguageSchema.optional(),
   contextSlice: TaskNodeContextSliceSchema.optional(),
+  decisionId: z.string().optional(),
 });
 export type TaskNode = z.infer<typeof TaskNodeSchema>;
 

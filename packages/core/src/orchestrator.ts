@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import { readFile, stat, readdir } from "node:fs/promises";
 import { join, relative } from "node:path";
 import {
@@ -31,6 +32,7 @@ import {
 import { routeNode, type RouterOptions } from "./router.js";
 import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
+import { isBlockedByQuestion } from "./speculative.js";
 
 const MAX_FILE_BYTES = 8_000;
 const MAX_TOTAL_BYTES = 24_000;
@@ -99,6 +101,8 @@ export class Orchestrator {
     draft: import("@amase/contracts").DecisionDraft;
     decisionsPath: string;
   }> = new Map();
+  private blockedDecisionsByRun: Map<string, Set<string>> = new Map();
+  private blockedChangedByRun: Map<string, EventEmitter> = new Map();
 
   constructor(private deps: OrchestratorDeps) {}
 
@@ -106,6 +110,14 @@ export class Orchestrator {
     const list = this.pendingQuestions.get(q.runId) ?? [];
     list.push(q);
     this.pendingQuestions.set(q.runId, list);
+    const blocked = this.blockedDecisionsByRun.get(q.runId) ?? new Set<string>();
+    blocked.add(q.questionId);
+    this.blockedDecisionsByRun.set(q.runId, blocked);
+  }
+
+  /** Current set of questionIds that are still unanswered for the given run. */
+  blockedDecisions(runId: string): Set<string> {
+    return this.blockedDecisionsByRun.get(runId) ?? new Set<string>();
   }
 
   pendingQuestion(runId: string): UserQuestion | null {
@@ -132,6 +144,12 @@ export class Orchestrator {
       const idx = list.findIndex((q) => q.questionId === ans.questionId);
       if (idx >= 0) list.splice(idx, 1);
       if (list.length === 0) this.pendingQuestions.delete(ans.runId);
+    }
+    const blocked = this.blockedDecisionsByRun.get(ans.runId);
+    if (blocked) {
+      blocked.delete(ans.questionId);
+      const emitter = this.blockedChangedByRun.get(ans.runId);
+      if (emitter) emitter.emit("change");
     }
     const ctx = this.pendingDecisionContext.get(ans.questionId);
     if (ctx) {
@@ -468,7 +486,32 @@ export class Orchestrator {
       return "failed";
     };
 
-    await runScheduler(dagId, this.deps.store, execute);
+    // Speculative execution: skip nodes whose transitive deps include an
+    // unanswered decision, while letting unblocked siblings run. Questions
+    // enqueued during plan() use dagId as their runId, so we union both
+    // dagId- and runId-keyed blocked sets.
+    const blockedChanged = new EventEmitter();
+    this.blockedChangedByRun.set(dagId, blockedChanged);
+    this.blockedChangedByRun.set(runId, blockedChanged);
+    const nodesById = new Map<string, TaskNode>(graph.nodes.map((n) => [n.id, n]));
+    const currentBlocked = (): Set<string> => {
+      const merged = new Set<string>();
+      for (const id of this.blockedDecisionsByRun.get(dagId) ?? []) merged.add(id);
+      for (const id of this.blockedDecisionsByRun.get(runId) ?? []) merged.add(id);
+      return merged;
+    };
+    const isBlocked = (node: TaskNode): boolean =>
+      isBlockedByQuestion(node, currentBlocked(), nodesById);
+
+    try {
+      await runScheduler(dagId, this.deps.store, execute, {
+        isBlocked,
+        blockedChanged,
+      });
+    } finally {
+      this.blockedChangedByRun.delete(dagId);
+      this.blockedChangedByRun.delete(runId);
+    }
 
     if (this.deps.deploymentReadiness) {
       const gate = buildDeploymentReadinessGate();
