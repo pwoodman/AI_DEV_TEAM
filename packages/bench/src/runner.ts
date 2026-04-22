@@ -24,7 +24,9 @@ export async function runBench(cfg: RunConfig): Promise<BenchResult[]> {
     const fx = await loadFixture(id);
     const perStack = await Promise.all(
       cfg.stacks.map(async (stack) => {
-        const opts = { runId, live: cfg.live };
+        const model = "claude-sonnet-4-6";
+        const fairness: "primary" = "primary";
+        const opts = { runId, runSeq: 1, model, fairness, live: cfg.live };
         return stack === "amase" ? await runAmase(fx, opts) : await runSuperpowers(fx, opts);
       }),
     );

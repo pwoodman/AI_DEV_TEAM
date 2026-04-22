@@ -279,9 +279,13 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       timestamp: new Date().toISOString(),
       taskId: fx.id,
       stack: "amase",
+      model: opts.model,
+      runSeq: opts.runSeq,
       pass,
       tokensIn,
       tokensOut,
+      tokensCached: 0,             // real value wired in Task 7
+      validatorFailures: 0,        // real value wired in Task 7
       wallMs,
       diffSimilarity,
       retries,

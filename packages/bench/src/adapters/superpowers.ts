@@ -226,9 +226,13 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     timestamp: new Date().toISOString(),
     taskId: fx.id,
     stack: "superpowers",
+    model: opts.model,
+    runSeq: opts.runSeq,
     pass,
     tokensIn,
     tokensOut,
+    tokensCached: 0,             // real value wired in Task 8
+    validatorFailures: 0,        // real value wired in Task 7
     wallMs,
     diffSimilarity,
     retries,
