@@ -12,13 +12,25 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (p.op === "delete") continue;
     if (!/\.(ts|tsx)$/.test(p.path)) continue;
     if (TS_IGNORE.test(p.content)) {
-      issues.push({ file: p.path, message: "@ts-ignore without justification comment. Use @ts-expect-error and explain why.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "@ts-ignore without justification comment. Use @ts-expect-error and explain why.",
+        severity: "warning",
+      });
     }
     if (ANY_CAST.test(p.content)) {
-      issues.push({ file: p.path, message: "'as any' cast. Parse/validate instead, or use 'unknown' + narrowing.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "'as any' cast. Parse/validate instead, or use 'unknown' + narrowing.",
+        severity: "warning",
+      });
     }
     if (BARE_ENUM.test(p.content)) {
-      issues.push({ file: p.path, message: "Avoid TS enums; prefer 'as const' object + union type.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "Avoid TS enums; prefer 'as const' object + union type.",
+        severity: "warning",
+      });
     }
   }
   return {

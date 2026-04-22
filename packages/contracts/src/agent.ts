@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { DecisionDraftSchema } from "./decision.js";
 import { AgentKindSchema, LanguageSchema } from "./kinds.js";
 import { TaskNodeSchema } from "./task.js";
-import { DecisionDraftSchema } from "./decision.js";
 
 export { AgentKindSchema };
 export type { AgentKind } from "./kinds.js";
@@ -62,7 +62,10 @@ export type Patch = z.infer<typeof PatchSchema>;
 export const AgentOutputSchema = z.object({
   taskId: z.string().min(1),
   patches: z.array(PatchSchema),
-  notes: z.union([z.string(), z.array(z.string())]).transform((v) => (Array.isArray(v) ? v.join("; ") : v)).pipe(z.string().max(2000)),
+  notes: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v.join("; ") : v))
+    .pipe(z.string().max(200)),
   followups: z.array(TaskNodeSchema).optional(),
   decisions: z.array(DecisionDraftSchema).optional(),
   needsUserInput: z.object({ reason: z.string() }).optional(),

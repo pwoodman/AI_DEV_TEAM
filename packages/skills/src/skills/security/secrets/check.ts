@@ -3,11 +3,17 @@ import type { SkillCheckContext } from "../../../types.js";
 
 const PATTERNS: Array<{ re: RegExp; msg: string }> = [
   { re: /AKIA[0-9A-Z]{16}/, msg: "AWS access key id detected." },
-  { re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/, msg: "Private key material detected." },
+  {
+    re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/,
+    msg: "Private key material detected.",
+  },
   { re: /ghp_[A-Za-z0-9]{36}/, msg: "GitHub personal access token detected." },
   { re: /sk-[A-Za-z0-9]{20,}/, msg: "API key (sk-...) detected." },
   { re: /xox[baprs]-[A-Za-z0-9-]{10,}/, msg: "Slack token detected." },
-  { re: /(?:password|passwd|pwd|secret|api[_-]?key|token)\s*[:=]\s*["'][^"'\s]{8,}["']/i, msg: "Hardcoded credential literal." },
+  {
+    re: /(?:password|passwd|pwd|secret|api[_-]?key|token)\s*[:=]\s*["'][^"'\s]{8,}["']/i,
+    msg: "Hardcoded credential literal.",
+  },
 ];
 
 export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<ValidationResult> {

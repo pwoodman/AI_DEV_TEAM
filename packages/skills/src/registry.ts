@@ -2,15 +2,15 @@ import type { AgentKind, Language, Patch, ValidationResult } from "@amase/contra
 import { loadGuide } from "./loader.js";
 import type { Skill, SkillAppliesTo } from "./types.js";
 
+import { check as backendDataModelCheck } from "./skills/backend/data-model/check.js";
 // Check modules
 import { check as backendRestApiCheck } from "./skills/backend/rest-api/check.js";
-import { check as backendDataModelCheck } from "./skills/backend/data-model/check.js";
-import { check as frontendAccessibilityCheck } from "./skills/frontend/accessibility/check.js";
-import { check as langTypeScriptCheck } from "./skills/lang/typescript/check.js";
-import { check as langPythonCheck } from "./skills/lang/python/check.js";
-import { check as langGoCheck } from "./skills/lang/go/check.js";
-import { check as securitySecretsCheck } from "./skills/security/secrets/check.js";
 import { check as deploymentDockerizeCheck } from "./skills/deployment/dockerize/check.js";
+import { check as frontendAccessibilityCheck } from "./skills/frontend/accessibility/check.js";
+import { check as langGoCheck } from "./skills/lang/go/check.js";
+import { check as langPythonCheck } from "./skills/lang/python/check.js";
+import { check as langTypeScriptCheck } from "./skills/lang/typescript/check.js";
+import { check as securitySecretsCheck } from "./skills/security/secrets/check.js";
 
 function skill(
   id: string,
@@ -22,9 +22,21 @@ function skill(
 }
 
 export const ALL_SKILLS: Skill[] = [
-  skill("backend/rest-api", "REST API design conventions", { kinds: ["backend"] }, backendRestApiCheck),
-  skill("backend/async-jobs", "Async job design: idempotency, retries, DLQs", { kinds: ["backend"] }),
-  skill("backend/data-model", "Data model + migration safety", { kinds: ["backend"] }, backendDataModelCheck),
+  skill(
+    "backend/rest-api",
+    "REST API design conventions",
+    { kinds: ["backend"] },
+    backendRestApiCheck,
+  ),
+  skill("backend/async-jobs", "Async job design: idempotency, retries, DLQs", {
+    kinds: ["backend"],
+  }),
+  skill(
+    "backend/data-model",
+    "Data model + migration safety",
+    { kinds: ["backend"] },
+    backendDataModelCheck,
+  ),
   skill("frontend/component-design", "Component boundaries and props", { kinds: ["frontend"] }),
   skill("frontend/state-management", "Local vs shared vs server state", { kinds: ["frontend"] }),
   skill(
@@ -64,7 +76,9 @@ export const ALL_SKILLS: Skill[] = [
     kinds: ["deployment"],
     pathPatterns: [/\.github[\\/]workflows[\\/].+\.ya?ml$/],
   }),
-  skill("deployment/observability", "Logs, metrics, traces, SLOs", { kinds: ["deployment", "backend"] }),
+  skill("deployment/observability", "Logs, metrics, traces, SLOs", {
+    kinds: ["deployment", "backend"],
+  }),
 ];
 
 export const SKILL_INDEX: Map<string, Skill> = new Map(ALL_SKILLS.map((s) => [s.id, s]));
@@ -80,10 +94,11 @@ export function resolveSkills(opts: ResolveOptions): Skill[] {
   for (const s of ALL_SKILLS) {
     const kindMatch = !s.appliesTo.kinds || s.appliesTo.kinds.includes(opts.kind);
     const langMatch =
-      !s.appliesTo.languages || (opts.language ? s.appliesTo.languages.includes(opts.language) : false);
+      !s.appliesTo.languages ||
+      (opts.language ? s.appliesTo.languages.includes(opts.language) : false);
     const pathMatch =
       s.appliesTo.pathPatterns && opts.touchedPaths
-        ? opts.touchedPaths.some((p) => s.appliesTo.pathPatterns!.some((re) => re.test(p)))
+        ? opts.touchedPaths.some((p) => s.appliesTo.pathPatterns?.some((re) => re.test(p)))
         : false;
 
     // A skill applies if:

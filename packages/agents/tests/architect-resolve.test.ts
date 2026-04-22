@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { type DecisionDraft, DecisionDraftSchema } from "@amase/ambiguity";
 import { StubLlmClient } from "@amase/llm";
-import { DecisionDraftSchema, type DecisionDraft } from "@amase/ambiguity";
+import { describe, expect, it } from "vitest";
 import { ArchitectAgent, generateQuestion } from "../src/architect.js";
 
 function draft(partial: Partial<DecisionDraft> = {}): DecisionDraft {

@@ -1,4 +1,4 @@
-import { mkdir, appendFile } from "node:fs/promises";
+import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { runAmase } from "./adapters/amase.js";
 import { runSuperpowers } from "./adapters/superpowers.js";
@@ -22,11 +22,15 @@ export async function runBench(cfg: RunConfig): Promise<BenchResult[]> {
   const results: BenchResult[] = [];
   for (const id of allIds) {
     const fx = await loadFixture(id);
-    for (const stack of cfg.stacks) {
-      const opts = { runId, live: cfg.live };
-      const result = stack === "amase" ? await runAmase(fx, opts) : await runSuperpowers(fx, opts);
+    const perStack = await Promise.all(
+      cfg.stacks.map(async (stack) => {
+        const opts = { runId, live: cfg.live };
+        return stack === "amase" ? await runAmase(fx, opts) : await runSuperpowers(fx, opts);
+      }),
+    );
+    for (const result of perStack) {
       results.push(result);
-      await appendFile(outFile, JSON.stringify(result) + "\n");
+      await appendFile(outFile, `${JSON.stringify(result)}\n`);
     }
   }
   return results;

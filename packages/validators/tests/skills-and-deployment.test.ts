@@ -26,7 +26,11 @@ describe("security validator", () => {
 
   it("passes clean code", async () => {
     const res = await v.run(
-      { taskId: "t1", notes: "", patches: [{ path: "src/a.ts", op: "create", content: "export const x = 1;\n" }] },
+      {
+        taskId: "t1",
+        notes: "",
+        patches: [{ path: "src/a.ts", op: "create", content: "export const x = 1;\n" }],
+      },
       ctx,
     );
     expect(res.ok).toBe(true);
@@ -69,7 +73,8 @@ describe("deployment readiness gate", () => {
           {
             path: "Dockerfile",
             op: "create",
-            content: "FROM node:20\nHEALTHCHECK CMD curl -f http://localhost/healthz\nlogger.info('x')\n",
+            content:
+              "FROM node:20\nHEALTHCHECK CMD curl -f http://localhost/healthz\nlogger.info('x')\n",
           },
           {
             path: ".github/workflows/ci.yml",

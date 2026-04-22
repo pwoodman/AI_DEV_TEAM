@@ -51,7 +51,8 @@ export class ASTIndex {
       const name = cls.getName();
       if (name) out.push({ path, name, kind: "class" });
     }
-    for (const iface of src.getInterfaces()) out.push({ path, name: iface.getName(), kind: "interface" });
+    for (const iface of src.getInterfaces())
+      out.push({ path, name: iface.getName(), kind: "interface" });
     for (const t of src.getTypeAliases()) out.push({ path, name: t.getName(), kind: "type" });
     for (const v of src.getVariableDeclarations()) {
       if (v.getParentIfKind(SyntaxKind.VariableDeclarationList)) {

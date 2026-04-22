@@ -1,10 +1,10 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AgentInput } from "@amase/contracts";
 import { StubLlmClient } from "@amase/llm";
-import { BackendAgent, type ASTIndexLike } from "../src/index.js";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { type ASTIndexLike, BackendAgent } from "../src/index.js";
 
 const okResponse = () =>
   JSON.stringify({
@@ -31,9 +31,6 @@ function makeInput(overrides: Partial<AgentInput> = {}): AgentInput {
 class CapturingBackendAgent extends BackendAgent {
   public capturedUser = "";
   public capturedFiles: Array<{ path: string; slice: string }> = [];
-  constructor(llm: ConstructorParameters<typeof BackendAgent>[0], ast?: ASTIndexLike) {
-    super(llm, ast);
-  }
   protected override buildUserMessage(input: AgentInput): string {
     this.capturedFiles = input.context.files.map((f) => ({ ...f }));
     const msg = super.buildUserMessage(input);
@@ -61,10 +58,7 @@ describe("BaseAgent contextSlice resolution", () => {
   it("resolves contextSlice.files from disk and injects into context.files", async () => {
     const llm = new StubLlmClient(okResponse);
     const agent = new CapturingBackendAgent(llm);
-    await agent.run(
-      makeInput({ contextSlice: { files: ["types.ts"] } }),
-      workspace,
-    );
+    await agent.run(makeInput({ contextSlice: { files: ["types.ts"] } }), workspace);
     expect(agent.capturedFiles.map((f) => f.path)).toEqual(["types.ts"]);
     expect(agent.capturedFiles[0]?.slice).toContain("type Foo");
   });
@@ -94,10 +88,7 @@ describe("BaseAgent contextSlice resolution", () => {
     const llm = new StubLlmClient(okResponse);
     const agent = new CapturingBackendAgent(llm);
     const seededFiles = [{ path: "preexisting.ts", slice: "// already here" }];
-    const { output } = await agent.run(
-      makeInput({ context: { files: seededFiles } }),
-      workspace,
-    );
+    const { output } = await agent.run(makeInput({ context: { files: seededFiles } }), workspace);
     expect(output.patches[0]?.path).toBe("src/a.ts");
     // Existing files untouched
     expect(agent.capturedFiles).toEqual(seededFiles);
@@ -127,10 +118,7 @@ describe("BaseAgent contextSlice resolution", () => {
   it("skips unreadable files gracefully", async () => {
     const llm = new StubLlmClient(okResponse);
     const agent = new CapturingBackendAgent(llm);
-    await agent.run(
-      makeInput({ contextSlice: { files: ["does-not-exist.ts"] } }),
-      workspace,
-    );
+    await agent.run(makeInput({ contextSlice: { files: ["does-not-exist.ts"] } }), workspace);
     // Nothing resolved — context.files remains empty and run still completes.
     expect(agent.capturedFiles).toEqual([]);
   });

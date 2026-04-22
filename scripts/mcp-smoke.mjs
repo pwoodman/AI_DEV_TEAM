@@ -105,8 +105,8 @@ try {
     arguments: { runId: exec.runId },
   });
   const artifacts = JSON.parse(artifactsRes.content[0].text);
-  console.log("artifacts: workspace=" + artifacts.workspace);
-  console.log("artifacts: events=" + artifacts.log.map((e) => e.event).join(" -> "));
+  console.log(`artifacts: workspace=${artifacts.workspace}`);
+  console.log(`artifacts: events=${artifacts.log.map((e) => e.event).join(" -> ")}`);
 
   const expected = ["amase_plan", "amase_execute", "amase_status", "amase_artifacts"];
   const got = tools.tools.map((t) => t.name).sort();

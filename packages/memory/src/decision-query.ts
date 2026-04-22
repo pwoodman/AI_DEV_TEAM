@@ -1,5 +1,5 @@
-import type { DecisionDraft } from "@amase/contracts";
 import { dirname, extname } from "node:path";
+import type { DecisionDraft } from "@amase/contracts";
 
 export function touchedPathsSignature(d: DecisionDraft): string[] {
   const buckets = new Map<string, string>();

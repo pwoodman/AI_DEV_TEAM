@@ -1,6 +1,6 @@
+import { patchSafetyValidator, schemaValidator } from "@amase/validators";
 import { describe, expect, it } from "vitest";
 import { selfCorrect } from "../src/self-correct.js";
-import { patchSafetyValidator, schemaValidator } from "@amase/validators";
 
 describe("selfCorrect", () => {
   it("re-emits when validator fails the first draft", async () => {
@@ -19,7 +19,12 @@ describe("selfCorrect", () => {
       },
     ];
     const result = await selfCorrect({
-      produce: async () => drafts[draftCount++]!,
+      produce: async () => {
+        const draft = drafts[draftCount];
+        draftCount++;
+        if (!draft) throw new Error("missing draft");
+        return draft;
+      },
       validators: [schemaValidator, patchSafetyValidator],
       ctx: { workspacePath: "/tmp", allowedPaths: ["src/"], touchesFrontend: false },
     });
@@ -52,9 +57,7 @@ describe("selfCorrect", () => {
         calls.push(fb);
         return {
           taskId: "t",
-          patches: [
-            { path: "outside/bad.ts", op: "create" as const, content: "" },
-          ],
+          patches: [{ path: "outside/bad.ts", op: "create" as const, content: "" }],
           notes: "n",
         };
       },
@@ -63,6 +66,6 @@ describe("selfCorrect", () => {
     });
     expect(calls[0]).toBeUndefined();
     expect(calls[1]).toBeDefined();
-    expect(calls[1]!.length).toBeGreaterThan(0);
+    expect(calls[1]?.length).toBeGreaterThan(0);
   });
 });

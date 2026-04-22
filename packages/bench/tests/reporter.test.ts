@@ -3,7 +3,12 @@ import { reportHeadline } from "../src/reporter.js";
 import type { BenchResult } from "../src/types.js";
 
 const base: Omit<BenchResult, "stack" | "pass" | "tokensIn" | "wallMs"> = {
-  runId: "r", timestamp: "t", taskId: "x", tokensOut: 0, diffSimilarity: 1, retries: 0,
+  runId: "r",
+  timestamp: "t",
+  taskId: "x",
+  tokensOut: 0,
+  diffSimilarity: 1,
+  retries: 0,
 };
 
 describe("reportHeadline", () => {
@@ -19,7 +24,14 @@ describe("reportHeadline", () => {
     const rs: BenchResult[] = [];
     for (let i = 0; i < 5; i++) {
       rs.push({ ...base, taskId: `t${i}`, stack: "amase", pass: true, tokensIn: 70, wallMs: 700 });
-      rs.push({ ...base, taskId: `t${i}`, stack: "superpowers", pass: true, tokensIn: 100, wallMs: 1000 });
+      rs.push({
+        ...base,
+        taskId: `t${i}`,
+        stack: "superpowers",
+        pass: true,
+        tokensIn: 100,
+        wallMs: 1000,
+      });
     }
     const h = reportHeadline(rs);
     expect(h.status).toBe("ok");
@@ -34,7 +46,14 @@ describe("reportHeadline", () => {
     const rs: BenchResult[] = [];
     for (let i = 0; i < 5; i++) {
       rs.push({ ...base, taskId: `t${i}`, stack: "amase", pass: i > 0, tokensIn: 70, wallMs: 700 });
-      rs.push({ ...base, taskId: `t${i}`, stack: "superpowers", pass: true, tokensIn: 100, wallMs: 1000 });
+      rs.push({
+        ...base,
+        taskId: `t${i}`,
+        stack: "superpowers",
+        pass: true,
+        tokensIn: 100,
+        wallMs: 1000,
+      });
     }
     expect(reportHeadline(rs).status).toBe("regression");
   });

@@ -1,20 +1,38 @@
-import { mkdtemp, writeFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { exec } from "node:child_process";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { buildAgentRegistry } from "@amase/agents";
 import { Orchestrator } from "@amase/core";
-import { StubLlmClient } from "@amase/llm";
+import { AnthropicClient, type LlmClient, StubLlmClient } from "@amase/llm";
 import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
 import { patchSafetyValidator, schemaValidator } from "@amase/validators";
 import { diffSimilarity as computeDiffSimilarity } from "../diff-similarity.js";
 import type { Fixture } from "../fixtures.js";
 import type { BenchResult, RunOpts } from "../types.js";
 
+const BENCH_WORKSPACES_DIR = join(process.cwd(), ".amase", "bench-workspaces");
+const FIXTURE_TEST_TIMEOUT_MS = 90_000;
+
 async function materializeTree(dest: string, tree: Map<string, string>): Promise<void> {
   for (const [rel, content] of tree) {
     const abs = join(dest, rel);
     await mkdir(dirname(abs), { recursive: true });
     await writeFile(abs, content);
+  }
+}
+
+async function copyDir(srcDir: string, destDir: string): Promise<void> {
+  const entries = await readdir(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const src = join(srcDir, entry.name);
+    const dest = join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      await mkdir(dest, { recursive: true });
+      await copyDir(src, dest);
+    } else if (entry.isFile()) {
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, await readFile(src, "utf8"));
+    }
   }
 }
 
@@ -65,18 +83,79 @@ function synthesizePatch(before: Map<string, string>, after: Map<string, string>
   return chunks.join("\n");
 }
 
+async function makeBenchWorkspace(prefix: string): Promise<string> {
+  await mkdir(BENCH_WORKSPACES_DIR, { recursive: true });
+  return await mkdtemp(join(BENCH_WORKSPACES_DIR, `${prefix}-`));
+}
+
+function pickContextFiles(tree: Map<string, string>): string[] {
+  const score = (p: string): number => {
+    let s = 0;
+    if (p.startsWith("src/")) s += 3;
+    if (p.startsWith("tests/")) s -= 2;
+    if (/\.(ts|tsx|js|jsx|py|go|sql)$/.test(p)) s += 2;
+    return s;
+  };
+  return [...tree.keys()]
+    .filter((p) => !p.startsWith("tests/"))
+    .sort((a, b) => score(b) - score(a))
+    .slice(0, 2);
+}
+
+async function runFixtureTests(workspace: string): Promise<{ pass: boolean; error?: string }> {
+  const configPath = join(process.cwd(), "packages/bench/vitest.fixture.config.ts");
+  const command = `pnpm exec vitest run --root "${workspace}" --config "${configPath}" --reporter=dot`;
+  const result = await new Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+    timedOut: boolean;
+  }>((resolve) => {
+    exec(
+      command,
+      {
+        timeout: FIXTURE_TEST_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024,
+        cwd: process.cwd(),
+        env: process.env,
+      },
+      (err, stdout, stderr) => {
+        if (!err) {
+          resolve({ code: 0, stdout, stderr, timedOut: false });
+          return;
+        }
+        const e = err as Error & { code?: number | string; killed?: boolean };
+        const numericCode =
+          typeof e.code === "number"
+            ? e.code
+            : Number.isFinite(Number(e.code))
+              ? Number(e.code)
+              : 1;
+        resolve({ code: numericCode, stdout, stderr, timedOut: e.killed === true });
+      },
+    );
+  });
+
+  if (result.code === 0) return { pass: true };
+  const tail = (result.stderr || result.stdout).trim().slice(-700);
+  return {
+    pass: false,
+    error: result.timedOut
+      ? `fixture-tests-timeout-${FIXTURE_TEST_TIMEOUT_MS}ms`
+      : tail || `fixture-tests-exit-${result.code}`,
+  };
+}
+
 /**
  * Build a stub LLM responder that mimics the smoke-orchestrator.mjs approach.
  * The architect emits a task-graph with a single refactor node, and the refactor
  * agent emits a placeholder patch. The stub LLM path does not produce a correct
  * fix — pass=false is expected at Task 3 scope.
  */
-function buildStubResponder(workspacePath: string, prompt: string) {
+function buildStubResponder(workspacePath: string, prompt: string, contextFiles: string[]) {
   return (req: { system: string | { text: string }[]; user: string }) => {
     const systemText =
-      typeof req.system === "string"
-        ? req.system
-        : req.system.map((b) => b.text).join("\n");
+      typeof req.system === "string" ? req.system : req.system.map((b) => b.text).join("\n");
     const isArchitect = systemText.includes("Architect Agent");
     if (isArchitect) {
       const graph = {
@@ -91,14 +170,13 @@ function buildStubResponder(workspacePath: string, prompt: string) {
             goal: prompt,
             dependsOn: [],
             allowedPaths: ["src/"],
+            ...(contextFiles.length > 0 ? { contextSlice: { files: contextFiles } } : {}),
           },
         ],
       };
       return JSON.stringify({
         taskId: "bootstrap",
-        patches: [
-          { path: ".amase/task-graph.json", op: "create", content: JSON.stringify(graph) },
-        ],
+        patches: [{ path: ".amase/task-graph.json", op: "create", content: JSON.stringify(graph) }],
         notes: "stub plan",
       });
     }
@@ -109,7 +187,7 @@ function buildStubResponder(workspacePath: string, prompt: string) {
         {
           path: "src/stub-output.ts",
           op: "create",
-          content: `// stub LLM output\nexport const stub = true;\n`,
+          content: "// stub LLM output\nexport const stub = true;\n",
         },
       ],
       notes: "stub patch",
@@ -118,16 +196,25 @@ function buildStubResponder(workspacePath: string, prompt: string) {
 }
 
 export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult> {
-  // Force stub LLM path for Task 3.
-  process.env.AMASE_LLM_STUB = "1";
+  // Live runs must not set AMASE_LLM_STUB — that's what forces the stub path
+  // inside mcp-server and friends. For stub/unit benches we keep it on.
+  if (!opts.live) {
+    process.env.AMASE_LLM_STUB = "1";
+  } else {
+    delete process.env.AMASE_LLM_STUB;
+  }
 
-  const workspace = await mkdtemp(join(tmpdir(), `amase-bench-${fx.id}-`));
+  const workspace = await makeBenchWorkspace(`amase-${fx.id}`);
   let dagId: string | undefined;
 
   try {
     await materializeTree(workspace, fx.beforeTree);
+    await copyDir(fx.testsDir, join(workspace, "tests"));
 
-    const llm = new StubLlmClient(buildStubResponder(workspace, fx.prompt));
+    const contextFiles = pickContextFiles(fx.beforeTree);
+    const llm: LlmClient = opts.live
+      ? new AnthropicClient()
+      : new StubLlmClient(buildStubResponder(workspace, fx.prompt, contextFiles));
     const agents = buildAgentRegistry(llm);
     const store = new DAGStore();
     const orchestrator = new Orchestrator({
@@ -166,9 +253,10 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
         }
       }
 
-      // Task 3 scope: skip running fixture tests (no node_modules in temp worktree).
-      // pass remains false — the stub LLM doesn't produce a real fix anyway.
-      pass = false;
+      // Execute fixture tests against the produced workspace to score pass/fail.
+      const testResult = await runFixtureTests(paths.workspace);
+      pass = testResult.pass;
+      if (!pass && !error) error = testResult.error;
     } catch (e) {
       error = (e as Error).message;
     }

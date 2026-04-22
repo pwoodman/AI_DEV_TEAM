@@ -1,10 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { AgentOutput } from "@amase/contracts";
-import {
-  patchSafetyValidator,
-  runValidatorChain,
-  schemaValidator,
-} from "../src/index.js";
+import { describe, expect, it } from "vitest";
+import { patchSafetyValidator, runValidatorChain, schemaValidator } from "../src/index.js";
 
 const okOutput: AgentOutput = {
   taskId: "t1",
@@ -89,10 +85,11 @@ describe("runValidatorChain", () => {
   });
 
   it("runs all validators when they pass", async () => {
-    const outcome = await runValidatorChain(okOutput, { workspacePath: ".", allowedPaths: ["src/"] }, [
-      schemaValidator,
-      patchSafetyValidator,
-    ]);
+    const outcome = await runValidatorChain(
+      okOutput,
+      { workspacePath: ".", allowedPaths: ["src/"] },
+      [schemaValidator, patchSafetyValidator],
+    );
     expect(outcome.ok).toBe(true);
     expect(outcome.results).toHaveLength(2);
   });

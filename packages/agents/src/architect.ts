@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { scoreDecision, classifyDecision, type DecisionDraft } from "@amase/ambiguity";
-import { buildCachedSystem, type LlmClient } from "@amase/llm";
+import { type DecisionDraft, classifyDecision, scoreDecision } from "@amase/ambiguity";
 import type { UserQuestion } from "@amase/contracts";
-import { findReusableDecision, type LoggedDecision } from "@amase/memory";
+import { type LlmClient, buildCachedSystem } from "@amase/llm";
+import { type LoggedDecision, findReusableDecision } from "@amase/memory";
 import { BaseAgent } from "./base-agent.js";
 
 const QGEN_SYSTEM = `Generate exactly 3 distinct options to resolve the engineering decision.
@@ -44,14 +44,15 @@ export async function generateQuestion(
   while (opts.length < 3) {
     opts.push({ label: `Option ${String.fromCharCode(65 + opts.length)}`, detail: "" });
   }
-  const rec = (parsed.recommended === 0 || parsed.recommended === 1 || parsed.recommended === 2)
-    ? parsed.recommended
-    : 0;
+  const rec =
+    parsed.recommended === 0 || parsed.recommended === 1 || parsed.recommended === 2
+      ? parsed.recommended
+      : 0;
   return {
     questionId: randomUUID(),
     runId,
     question: parsed.question ?? (d.summary || "Clarify decision"),
-    options: opts as [typeof opts[0], typeof opts[0], typeof opts[0]],
+    options: opts as [(typeof opts)[0], (typeof opts)[0], (typeof opts)[0]],
     recommended: rec,
     reason: parsed.reason ?? d.summary,
   };

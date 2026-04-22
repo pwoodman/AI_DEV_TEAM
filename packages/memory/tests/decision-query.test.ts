@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
-import { findReusableDecision, touchedPathsSignature, type LoggedDecision } from "../src/decision-query.js";
 import type { DecisionDraft } from "@amase/contracts";
+import { describe, expect, it } from "vitest";
+import {
+  type LoggedDecision,
+  findReusableDecision,
+  touchedPathsSignature,
+} from "../src/decision-query.js";
 
 const base: DecisionDraft = {
-  kind: "logic", summary: "s", touchedPaths: ["src/a/b.ts", "src/a/c.ts"], fileCount: 2,
-  changesPublicApi: false, changesDataModel: false, crossesModuleBoundary: false, crossCuttingConcern: "none",
+  kind: "logic",
+  summary: "s",
+  touchedPaths: ["src/a/b.ts", "src/a/c.ts"],
+  fileCount: 2,
+  changesPublicApi: false,
+  changesDataModel: false,
+  crossesModuleBoundary: false,
+  crossCuttingConcern: "none",
 };
 
 describe("decision-query", () => {

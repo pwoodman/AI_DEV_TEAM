@@ -13,19 +13,39 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (p.op === "delete") continue;
     if (!/(^|\/)Dockerfile(\.|$)/.test(p.path)) continue;
     if (LATEST_TAG.test(p.content)) {
-      issues.push({ file: p.path, message: "Base image pinned to :latest. Pin a specific version or digest.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "Base image pinned to :latest. Pin a specific version or digest.",
+        severity: "warning",
+      });
     }
     if (NO_TAG.test(p.content)) {
-      issues.push({ file: p.path, message: "FROM without a tag. Pin a specific version.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "FROM without a tag. Pin a specific version.",
+        severity: "warning",
+      });
     }
     if (ROOT_USER.test(p.content)) {
-      issues.push({ file: p.path, message: "Container runs as root. Add a non-root USER.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "Container runs as root. Add a non-root USER.",
+        severity: "warning",
+      });
     }
     if (!/^\s*USER\s+/im.test(p.content)) {
-      issues.push({ file: p.path, message: "No USER directive. Container will run as root by default.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "No USER directive. Container will run as root by default.",
+        severity: "warning",
+      });
     }
     if (ADD_REMOTE.test(p.content)) {
-      issues.push({ file: p.path, message: "ADD <url> fetches unpinned remote content. Use curl+checksum in a RUN step.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "ADD <url> fetches unpinned remote content. Use curl+checksum in a RUN step.",
+        severity: "warning",
+      });
     }
     if (!/HEALTHCHECK/i.test(p.content)) {
       issues.push({ file: p.path, message: "No HEALTHCHECK defined.", severity: "warning" });

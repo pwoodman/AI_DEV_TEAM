@@ -1,7 +1,8 @@
 import type { Patch, ValidationResult } from "@amase/contracts";
 import type { SkillCheckContext } from "../../../types.js";
 
-const VERB_IN_PATH = /["'`](?:GET|POST|PUT|PATCH|DELETE)?\s*\/[a-zA-Z0-9_\-\/]*\/(?:get|create|update|delete|fetch|list)[A-Z][a-zA-Z]*/;
+const VERB_IN_PATH =
+  /["'`](?:GET|POST|PUT|PATCH|DELETE)?\s*\/[a-zA-Z0-9_\-\/]*\/(?:get|create|update|delete|fetch|list)[A-Z][a-zA-Z]*/;
 const STACK_LEAK = /res\.(?:send|json)\s*\(\s*(?:err|error)(?:\.stack)?\s*\)/;
 
 export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<ValidationResult> {

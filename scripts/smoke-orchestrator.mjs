@@ -5,10 +5,7 @@ import { buildAgentRegistry } from "../packages/agents/dist/index.js";
 import { Orchestrator } from "../packages/core/dist/index.js";
 import { StubLlmClient } from "../packages/llm/dist/index.js";
 import { DAGStore, DecisionLog, runPaths } from "../packages/memory/dist/index.js";
-import {
-  patchSafetyValidator,
-  schemaValidator,
-} from "../packages/validators/dist/index.js";
+import { patchSafetyValidator, schemaValidator } from "../packages/validators/dist/index.js";
 
 const workspacePath = await mkdtemp(join(tmpdir(), "amase-smoke-"));
 console.log("workspace:", workspacePath);
@@ -40,9 +37,7 @@ const responder = (req) => {
     };
     return JSON.stringify({
       taskId: "bootstrap",
-      patches: [
-        { path: ".amase/task-graph.json", op: "create", content: JSON.stringify(graph) },
-      ],
+      patches: [{ path: ".amase/task-graph.json", op: "create", content: JSON.stringify(graph) }],
       notes: "decomposed",
     });
   }
@@ -82,10 +77,7 @@ const { runId } = await orchestrator.execute(dagId);
 console.log("ran:", runId);
 
 const final = store.get(dagId);
-console.log(
-  "nodes:",
-  final.nodes.map((n) => `${n.id}:${n.status}`).join(", "),
-);
+console.log("nodes:", final.nodes.map((n) => `${n.id}:${n.status}`).join(", "));
 
 const decisions = await readFile(runPaths(workspacePath, dagId).decisions, "utf8");
 const events = decisions

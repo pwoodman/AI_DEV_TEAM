@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { StubLlmClient } from "@amase/llm";
+import { describe, expect, it } from "vitest";
 import { classifyDecision } from "../src/classifier.js";
-import { DecisionDraftSchema, type DecisionDraft } from "../src/types.js";
+import { type DecisionDraft, DecisionDraftSchema } from "../src/types.js";
 
 const draft: DecisionDraft = DecisionDraftSchema.parse({
   kind: "logic",

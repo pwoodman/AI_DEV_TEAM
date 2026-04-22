@@ -1,5 +1,5 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
@@ -14,10 +14,17 @@ export interface Fixture {
 
 export async function listFixtures(): Promise<string[]> {
   const entries = await readdir(FIXTURES_DIR, { withFileTypes: true });
-  return entries.filter((e) => e.isDirectory()).map((e) => e.name).sort();
+  return entries
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
 }
 
-async function readTree(root: string, acc = new Map<string, string>(), rel = ""): Promise<Map<string, string>> {
+async function readTree(
+  root: string,
+  acc = new Map<string, string>(),
+  rel = "",
+): Promise<Map<string, string>> {
   const entries = await readdir(join(root, rel), { withFileTypes: true });
   for (const e of entries) {
     const relPath = rel ? `${rel}/${e.name}` : e.name;

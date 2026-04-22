@@ -13,9 +13,7 @@ export const TaskStatusSchema = z.enum([
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 
 export const TaskNodeContextSliceSchema = z.object({
-  symbols: z
-    .array(z.object({ path: z.string().min(1), name: z.string().min(1) }))
-    .optional(),
+  symbols: z.array(z.object({ path: z.string().min(1), name: z.string().min(1) })).optional(),
   files: z.array(z.string()).optional(),
 });
 export type TaskNodeContextSlice = z.infer<typeof TaskNodeContextSliceSchema>;

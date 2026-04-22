@@ -30,7 +30,9 @@ export class DAGStore {
     const graph = this.graphs.get(dagId);
     if (!graph) return [];
     const completed = new Set(
-      graph.nodes.filter((n) => n.status === "completed" || n.status === "skipped").map((n) => n.id),
+      graph.nodes
+        .filter((n) => n.status === "completed" || n.status === "skipped")
+        .map((n) => n.id),
     );
     return graph.nodes.filter(
       (n) =>

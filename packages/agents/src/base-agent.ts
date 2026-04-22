@@ -12,11 +12,7 @@ import {
 import type { LlmCallResult, LlmClient } from "@amase/llm";
 import { renderTemplate } from "@amase/llm";
 import { getSkill } from "@amase/skills";
-import {
-  patchSafetyValidator,
-  schemaValidator,
-  type ValidatorContext,
-} from "@amase/validators";
+import { type ValidatorContext, patchSafetyValidator, schemaValidator } from "@amase/validators";
 import { selfCorrect } from "./self-correct.js";
 
 export interface AgentMetrics {
@@ -105,8 +101,7 @@ export abstract class BaseAgent {
     workspace?: string,
   ): Promise<Array<{ path: string; slice: string }>> {
     const out: Array<{ path: string; slice: string }> = [];
-    const toAbs = (p: string): string =>
-      isAbsolute(p) || !workspace ? p : join(workspace, p);
+    const toAbs = (p: string): string => (isAbsolute(p) || !workspace ? p : join(workspace, p));
 
     if (slice.files && slice.files.length > 0) {
       for (const rel of slice.files) {
@@ -142,10 +137,7 @@ export abstract class BaseAgent {
     // If caller supplied a contextSlice, resolve it into context.files
     // (replacing whatever the caller might have populated by naive walk).
     if (validated.contextSlice) {
-      const resolved = await this.buildContextFromSlice(
-        validated.contextSlice,
-        workspace,
-      );
+      const resolved = await this.buildContextFromSlice(validated.contextSlice, workspace);
       if (resolved.length > 0) {
         validated.context = { ...validated.context, files: resolved };
       }

@@ -4,7 +4,10 @@ import type { DecisionDraft } from "./types.js";
 
 const SYSTEM = `You classify whether an engineering decision needs user input. Return JSON {"decision": "ask" | "decide"} only.`;
 
-export async function classifyDecision(llm: LlmClient, d: DecisionDraft): Promise<"ask" | "decide"> {
+export async function classifyDecision(
+  llm: LlmClient,
+  d: DecisionDraft,
+): Promise<"ask" | "decide"> {
   const res = await llm.call({
     system: buildCachedSystem([{ text: SYSTEM }]),
     user: JSON.stringify(d),

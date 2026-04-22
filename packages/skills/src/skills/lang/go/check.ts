@@ -12,13 +12,25 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (p.op === "delete") continue;
     if (!/\.go$/.test(p.path)) continue;
     if (IGNORED_ERR.test(p.content)) {
-      issues.push({ file: p.path, message: "Ignoring error with '_'. Handle or wrap it with fmt.Errorf.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "Ignoring error with '_'. Handle or wrap it with fmt.Errorf.",
+        severity: "warning",
+      });
     }
     if (PANIC_IN_LIB.test(p.content) && !/_test\.go$|main\.go$/.test(p.path)) {
-      issues.push({ file: p.path, message: "panic() in library code. Return an error instead.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "panic() in library code. Return an error instead.",
+        severity: "warning",
+      });
     }
     if (FMT_PRINTLN.test(p.content) && !/_test\.go$|main\.go$|cmd\//.test(p.path)) {
-      issues.push({ file: p.path, message: "fmt.Println in library code. Use a logger.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "fmt.Println in library code. Use a logger.",
+        severity: "warning",
+      });
     }
   }
   return {

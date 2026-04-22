@@ -1,16 +1,33 @@
-import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, mkdir, readdir, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, dirname } from "node:path";
+import { exec } from "node:child_process";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { diffSimilarity as computeDiffSimilarity } from "../diff-similarity.js";
 import type { Fixture } from "../fixtures.js";
 import type { BenchResult, RunOpts } from "../types.js";
+
+const BENCH_WORKSPACES_DIR = join(process.cwd(), ".amase", "bench-workspaces");
+const FIXTURE_TEST_TIMEOUT_MS = 90_000;
 
 async function materializeTree(dest: string, tree: Map<string, string>): Promise<void> {
   for (const [rel, content] of tree) {
     const abs = join(dest, rel);
     await mkdir(dirname(abs), { recursive: true });
     await writeFile(abs, content);
+  }
+}
+
+async function copyDir(srcDir: string, destDir: string): Promise<void> {
+  const entries = await readdir(srcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const src = join(srcDir, entry.name);
+    const dest = join(destDir, entry.name);
+    if (entry.isDirectory()) {
+      await mkdir(dest, { recursive: true });
+      await copyDir(src, dest);
+    } else if (entry.isFile()) {
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, await readFile(src, "utf8"));
+    }
   }
 }
 
@@ -55,6 +72,55 @@ function synthesizePatch(before: Map<string, string>, after: Map<string, string>
   return chunks.join("\n");
 }
 
+async function makeBenchWorkspace(prefix: string): Promise<string> {
+  await mkdir(BENCH_WORKSPACES_DIR, { recursive: true });
+  return await mkdtemp(join(BENCH_WORKSPACES_DIR, `${prefix}-`));
+}
+
+async function runFixtureTests(workspace: string): Promise<{ pass: boolean; error?: string }> {
+  const configPath = join(process.cwd(), "packages/bench/vitest.fixture.config.ts");
+  const command = `pnpm exec vitest run --root "${workspace}" --config "${configPath}" --reporter=dot`;
+  const result = await new Promise<{
+    code: number;
+    stdout: string;
+    stderr: string;
+    timedOut: boolean;
+  }>((resolve) => {
+    exec(
+      command,
+      {
+        timeout: FIXTURE_TEST_TIMEOUT_MS,
+        maxBuffer: 10 * 1024 * 1024,
+        cwd: process.cwd(),
+        env: process.env,
+      },
+      (err, stdout, stderr) => {
+        if (!err) {
+          resolve({ code: 0, stdout, stderr, timedOut: false });
+          return;
+        }
+        const e = err as Error & { code?: number | string; killed?: boolean };
+        const numericCode =
+          typeof e.code === "number"
+            ? e.code
+            : Number.isFinite(Number(e.code))
+              ? Number(e.code)
+              : 1;
+        resolve({ code: numericCode, stdout, stderr, timedOut: e.killed === true });
+      },
+    );
+  });
+
+  if (result.code === 0) return { pass: true };
+  const tail = (result.stderr || result.stdout).trim().slice(-700);
+  return {
+    pass: false,
+    error: result.timedOut
+      ? `fixture-tests-timeout-${FIXTURE_TEST_TIMEOUT_MS}ms`
+      : tail || `fixture-tests-exit-${result.code}`,
+  };
+}
+
 /**
  * Walk any JSON object and sum every `{ input_tokens, output_tokens }` pair
  * we find at any nesting level. Claude CLI stream-json nests usage under
@@ -77,7 +143,7 @@ function extractUsage(obj: unknown): { in: number; out: number } {
 }
 
 export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchResult> {
-  const workspace = await mkdtemp(join(tmpdir(), `superpowers-bench-${fx.id}-`));
+  const workspace = await makeBenchWorkspace(`superpowers-${fx.id}`);
   const start = Date.now();
   let pass = false;
   let tokensIn = 0;
@@ -87,41 +153,35 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
 
   try {
     await materializeTree(workspace, fx.beforeTree);
+    await copyDir(fx.testsDir, join(workspace, "tests"));
 
     // Spawn claude CLI in non-interactive stream-json mode. The transcript is
     // emitted on stdout (there is no --transcript-out flag). We buffer stdout
     // and parse line-by-line after close. --permission-mode=bypassPermissions
     // is required for non-interactive fixture runs (no acceptAll option exists).
-    const args = [
-      "--print",
-      "--output-format=stream-json",
-      "--verbose",
-      "--permission-mode=bypassPermissions",
-      fx.prompt,
-    ];
-
     let stdoutBuf = "";
     let stderrBuf = "";
-
+    const command =
+      "claude --print --output-format=stream-json --verbose --permission-mode=bypassPermissions";
     await new Promise<void>((resolve) => {
-      const child = spawn("claude", args, {
-        cwd: workspace,
-        env: process.env,
-        shell: process.platform === "win32",
-      });
-      child.stdout.on("data", (chunk) => {
-        stdoutBuf += String(chunk);
-      });
-      child.stderr.on("data", (chunk) => {
-        stderrBuf += String(chunk);
-      });
-      child.on("error", (e) => {
-        error = (e as Error).message;
-        resolve();
-      });
-      child.on("close", () => {
-        resolve();
-      });
+      const child = exec(
+        command,
+        {
+          cwd: workspace,
+          env: process.env,
+          maxBuffer: 10 * 1024 * 1024,
+        },
+        (err, stdout, stderr) => {
+          stdoutBuf = stdout;
+          stderrBuf = stderr;
+          if (err) {
+            error = (err as Error).message;
+          }
+          resolve();
+        },
+      );
+      child.stdin?.write(fx.prompt);
+      child.stdin?.end();
     });
 
     for (const line of stdoutBuf.split(/\r?\n/)) {
@@ -141,11 +201,9 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
       error = stderrBuf.trim().slice(0, 500);
     }
 
-    // Task 5 scope: cannot run fixture vitest suite (no node_modules in
-    // fixture workspace, no shared test runner scoped). Mark pass=false
-    // with a sentinel error noting the limitation.
-    pass = false;
-    if (!error) error = "test-runner-not-scoped";
+    const testResult = await runFixtureTests(workspace);
+    pass = testResult.pass;
+    if (!pass && !error) error = testResult.error;
   } catch (e) {
     error = (e as Error).message;
   }

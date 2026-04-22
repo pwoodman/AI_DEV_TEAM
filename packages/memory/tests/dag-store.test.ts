@@ -1,8 +1,8 @@
 import { mkdtemp, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
 import type { TaskGraph } from "@amase/contracts";
+import { beforeEach, describe, expect, it } from "vitest";
 import { DAGStore } from "../src/index.js";
 
 function graph(overrides: Partial<TaskGraph> = {}): TaskGraph {

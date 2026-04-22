@@ -9,7 +9,7 @@ export interface EmbeddingProvider {
 export class VoyageEmbeddings implements EmbeddingProvider {
   constructor(
     private apiKey: string = process.env.VOYAGE_API_KEY ?? "",
-    private model: string = "voyage-code-3",
+    private model = "voyage-code-3",
   ) {
     if (!this.apiKey) throw new Error("VOYAGE_API_KEY not set");
   }
@@ -55,7 +55,11 @@ export class EmbeddingStore {
     if (!this.db) throw new Error("EmbeddingStore not opened");
     if (records.length === 0) return;
     const vectors = await this.provider.embed(records.map((r) => r.text));
-    const rows = records.map((r, i) => ({ ...r, vector: vectors[i]! }));
+    const rows = records.flatMap((r, i) => {
+      const vector = vectors[i];
+      return vector ? [{ ...r, vector }] : [];
+    });
+    if (rows.length === 0) return;
     if (!this.table) {
       this.table = await this.db.createTable("code_symbols", rows);
     } else {

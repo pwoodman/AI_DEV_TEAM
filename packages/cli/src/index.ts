@@ -26,7 +26,7 @@ async function main() {
   if (!cmd || (cmd !== "run" && cmd !== "plan")) usage();
 
   const wsIdx = rest.indexOf("--workspace");
-  const workspacePath = resolve(wsIdx >= 0 ? rest[wsIdx + 1] ?? "." : ".");
+  const workspacePath = resolve(wsIdx >= 0 ? (rest[wsIdx + 1] ?? ".") : ".");
   const request = rest.filter((_, i) => i !== wsIdx && i !== wsIdx + 1).join(" ");
   if (!request) usage();
 

@@ -45,7 +45,13 @@ describe("skill checks", () => {
     const secrets = ALL_SKILLS.filter((s) => s.id === "security/secrets");
     const res = await runSkillChecks(
       secrets,
-      [{ path: "src/config.ts", op: "create", content: "const key = 'sk-ABCDEFGHIJ1234567890XYZ';" }],
+      [
+        {
+          path: "src/config.ts",
+          op: "create",
+          content: "const key = 'sk-ABCDEFGHIJ1234567890XYZ';",
+        },
+      ],
       ctx,
     );
     expect(res[0].issues.some((i) => i.severity === "error")).toBe(true);
@@ -75,7 +81,7 @@ describe("skill checks", () => {
 describe("skill guides", () => {
   it("loads a guide from disk", async () => {
     const s = getSkill("backend/rest-api");
-    const text = await s!.guide();
+    const text = await s?.guide();
     expect(text).toContain("REST");
   });
 });

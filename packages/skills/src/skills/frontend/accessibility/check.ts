@@ -15,10 +15,18 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
       issues.push({ file: p.path, message: "<img> without alt attribute.", severity: "warning" });
     }
     if (CLICK_ON_DIV.test(p.content)) {
-      issues.push({ file: p.path, message: "onClick on <div>. Use <button> for interactive elements.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "onClick on <div>. Use <button> for interactive elements.",
+        severity: "warning",
+      });
     }
     if (PLACEHOLDER_NO_LABEL.test(p.content) && !/<label\b/i.test(p.content)) {
-      issues.push({ file: p.path, message: "Input uses placeholder but file has no <label>. Labels are required for a11y.", severity: "warning" });
+      issues.push({
+        file: p.path,
+        message: "Input uses placeholder but file has no <label>. Labels are required for a11y.",
+        severity: "warning",
+      });
     }
   }
   return {

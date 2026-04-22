@@ -12,6 +12,6 @@
     "lineWidth": 100
   },
   "files": {
-    "ignore": ["dist", "node_modules", ".amase"]
+    "ignore": ["dist", "node_modules", ".amase", "packages/bench/fixtures/**"]
   }
 }

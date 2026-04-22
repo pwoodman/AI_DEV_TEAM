@@ -3,7 +3,13 @@ import type { BenchResult } from "./types.js";
 export type Headline =
   | { status: "insufficient_signal"; bothPassed: number }
   | { status: "regression"; passRateDelta: number }
-  | { status: "ok"; tokenDelta: number; timeDelta: number; passRateDelta: number; bothPassed: number };
+  | {
+      status: "ok";
+      tokenDelta: number;
+      timeDelta: number;
+      passRateDelta: number;
+      bothPassed: number;
+    };
 
 export function reportHeadline(results: BenchResult[]): Headline {
   const byTask = new Map<string, { amase?: BenchResult; superpowers?: BenchResult }>();
@@ -14,7 +20,10 @@ export function reportHeadline(results: BenchResult[]): Headline {
   }
   let amasePassed = 0;
   let spPassed = 0;
-  let tokenA = 0, tokenS = 0, timeA = 0, timeS = 0;
+  let tokenA = 0;
+  let tokenS = 0;
+  let timeA = 0;
+  let timeS = 0;
   let bothPassed = 0;
   const total = byTask.size;
   for (const [, { amase, superpowers }] of byTask) {

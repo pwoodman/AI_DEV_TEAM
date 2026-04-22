@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { scoreDecision } from "../src/rubric.js";
-import { DecisionDraftSchema, type DecisionDraft } from "../src/types.js";
+import { type DecisionDraft, DecisionDraftSchema } from "../src/types.js";
 
 function draft(partial: Partial<DecisionDraft> = {}): DecisionDraft {
   return DecisionDraftSchema.parse({
