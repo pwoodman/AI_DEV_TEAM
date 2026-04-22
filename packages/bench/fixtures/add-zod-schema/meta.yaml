@@ -1,0 +1,3 @@
+category: micro
+language: ts
+summary: Add a zod schema for an existing interface and use it to parse input.

@@ -1,0 +1,3 @@
+category: micro
+language: ts
+summary: Guard a function against null/undefined input without changing callers.

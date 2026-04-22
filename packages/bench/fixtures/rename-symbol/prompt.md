@@ -1,1 +1,0 @@
-Rename the exported function `calcTotal` to `calculateTotal` in `src/totals.ts`, and update the imports and call sites in `src/cart.ts` and `src/report.ts` to use the new name. Do not change any behavior or signatures.

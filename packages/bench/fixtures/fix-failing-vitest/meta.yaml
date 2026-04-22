@@ -1,0 +1,3 @@
+category: micro
+language: ts
+summary: Locate and fix the bug that causes the shipped vitest to fail.

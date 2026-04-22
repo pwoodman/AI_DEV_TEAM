@@ -1,0 +1,3 @@
+category: micro
+language: ts
+summary: Add a --dry-run flag to the CLI.

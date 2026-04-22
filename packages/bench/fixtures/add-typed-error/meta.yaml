@@ -1,0 +1,3 @@
+category: micro
+language: ts
+summary: Replace a string throw with a typed Error subclass.
