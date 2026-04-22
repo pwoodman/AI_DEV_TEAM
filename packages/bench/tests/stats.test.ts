@@ -8,8 +8,8 @@ describe("stats", () => {
   it("mean of empty throws", () => {
     expect(() => mean([])).toThrow();
   });
-  it("stdev of [2,4,4,4,5,5,7,9] is ~2 (sample stdev)", () => {
-    expect(stdev([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2, 4);
+  it("stdev of [2,4,4,4,5,5,7,9] is ~2.1381 (sample stdev, Bessel-corrected)", () => {
+    expect(stdev([2, 4, 4, 4, 5, 5, 7, 9])).toBeCloseTo(2.1381, 3);
   });
   it("stdev of single value throws (needs n>=2)", () => {
     expect(() => stdev([5])).toThrow();

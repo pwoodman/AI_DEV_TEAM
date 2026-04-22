@@ -10,15 +10,12 @@ export function stdev(xs: readonly number[]): number {
   const m = mean(xs);
   let ss = 0;
   for (const x of xs) ss += (x - m) * (x - m);
-  return Math.sqrt(ss / xs.length);
+  return Math.sqrt(ss / (xs.length - 1));
 }
 
 // Internal sample variance (n-1 denominator) used by Welch's t-test
 function variance(xs: readonly number[]): number {
-  const m = mean(xs);
-  let ss = 0;
-  for (const x of xs) ss += (x - m) * (x - m);
-  return ss / (xs.length - 1);
+  return stdev(xs) ** 2;
 }
 
 export function welchT(a: readonly number[], b: readonly number[]): number {
