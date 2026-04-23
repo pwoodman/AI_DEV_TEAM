@@ -1,0 +1,1 @@
+{ "name": "fixture-add-new-validator-to-pipeline", "type": "module", "private": true, "devDependencies": { "vitest": "*" } }

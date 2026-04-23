@@ -1,0 +1,1 @@
+Add a `noAnyValidator` to `src/validators/no-any.ts` that rejects any patch whose `content` field contains the substring `': any'` or `'as any'`. Register it in `src/validators/registry.ts` so it runs in `defaultValidators` AFTER the schema validator.

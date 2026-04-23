@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Add a no-any validator to the patch-pipeline registry; rejects patches whose content contains ': any' or 'as any'.
