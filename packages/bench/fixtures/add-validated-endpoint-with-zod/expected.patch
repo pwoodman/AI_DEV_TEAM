@@ -1,0 +1,37 @@
+diff --git a/src/router.ts b/src/router.ts
+index db8cd00..6f089a8 100644
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -1,15 +1,32 @@
++import { z } from "zod";
+ import type { Item } from "./item.js";
+ import { store } from "./store.js";
+ 
+ export type Req = { method: string; path: string; body?: unknown };
+ export type Handler = (req: Req) => { status: number; body: unknown };
+ 
++const CreateItemSchema = z.object({
++  name: z.string(),
++  qty: z.number().nonnegative(),
++});
++
+ const routes: Array<{ method: string; path: string; handler: Handler }> = [
+   {
+     method: "GET",
+     path: "/ping",
+     handler: () => ({ status: 200, body: "pong" }),
+   },
++  {
++    method: "POST",
++    path: "/items",
++    handler: (req) => {
++      const result = CreateItemSchema.safeParse(req.body);
++      if (!result.success) return { status: 400, body: result.error.format() };
++      const item: Item = { id: crypto.randomUUID(), ...result.data };
++      store.push(item);
++      return { status: 201, body: item };
++    },
++  },
+ ];
+ 
+ export function handle(req: Req) {

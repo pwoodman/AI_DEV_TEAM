@@ -1,0 +1,3 @@
+category: medium
+language: ts
+summary: Add POST /items endpoint that parses body with zod, persists to an in-memory store, returns 201.

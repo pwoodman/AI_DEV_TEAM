@@ -1,0 +1,6 @@
+{
+  "name": "fixture-add-validated-endpoint-with-zod",
+  "type": "module",
+  "private": true,
+  "devDependencies": { "vitest": "*", "zod": "*" }
+}
