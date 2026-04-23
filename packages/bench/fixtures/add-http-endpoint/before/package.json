@@ -1,0 +1,6 @@
+{
+  "name": "fixture-add-http-endpoint",
+  "type": "module",
+  "private": true,
+  "devDependencies": { "vitest": "*" }
+}

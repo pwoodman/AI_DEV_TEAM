@@ -1,0 +1,3 @@
+category: medium
+language: ts
+summary: Add a GET /health endpoint to the existing router, returning status 200 with {ok:true}.

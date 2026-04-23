@@ -1,0 +1,16 @@
+diff --git a/src/router.ts b/src/router.ts
+index 9ab4269..cf123bb 100644
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -9,6 +9,11 @@ const routes: Array<{ method: string; path: string; handler: Handler }> = [
+     path: "/ping",
+     handler: () => ({ status: 200, body: "pong" }),
+   },
++  {
++    method: "GET",
++    path: "/health",
++    handler: () => ({ status: 200, body: { ok: true } }),
++  },
+ ];
+
+ export function handle(req: { method: string; path: string }) {
