@@ -1,0 +1,1 @@
+{ "name": "fixture-rename-package-export", "type": "module", "private": true, "devDependencies": { "vitest": "*" } }

@@ -1,0 +1,38 @@
+diff --git a/src/consumer-a.ts b/src/consumer-a.ts
+index 21d85ed..3d69d6c 100644
+--- a/src/consumer-a.ts
++++ b/src/consumer-a.ts
+@@ -1,4 +1,4 @@
+-import { runAll } from "./index.js";
++import { runQueue } from "./index.js";
+ export function consumerA(results: string[]): void {
+-  runAll([() => results.push("a1"), () => results.push("a2")]);
++  runQueue([() => results.push("a1"), () => results.push("a2")]);
+ }
+diff --git a/src/consumer-b.ts b/src/consumer-b.ts
+index 2f16fa6..4ccd45d 100644
+--- a/src/consumer-b.ts
++++ b/src/consumer-b.ts
+@@ -1,4 +1,4 @@
+-import { runAll } from "./index.js";
++import { runQueue } from "./index.js";
+ export function consumerB(results: string[]): void {
+-  runAll([() => results.push("b1")]);
++  runQueue([() => results.push("b1")]);
+ }
+diff --git a/src/index.ts b/src/index.ts
+index a2c6561..4e1fb30 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1 +1 @@
+-export { runAll } from "./queue.js";
++export { runQueue } from "./queue.js";
+diff --git a/src/queue.ts b/src/queue.ts
+index 08d79b4..02e91fc 100644
+--- a/src/queue.ts
++++ b/src/queue.ts
+@@ -1,3 +1,3 @@
+-export function runAll(jobs: Array<() => void>): void {
++export function runQueue(jobs: Array<() => void>): void {
+   for (const j of jobs) j();
+ }

@@ -1,0 +1,3 @@
+category: medium
+language: ts
+summary: Rename public export runAll → runQueue across package + re-exporter + 2 consumers.
