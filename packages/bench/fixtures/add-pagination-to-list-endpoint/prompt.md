@@ -1,0 +1,1 @@
+Extend `GET /items` with `?page=<n>&pageSize=<k>` query support. Defaults: `page=1`, `pageSize=10`. Cap `pageSize` at 50. Response shape: `{ items, page, pageSize, total }`. Ordering must be stable — sort by `id`. The request object gives you `req.query: Record<string, string>`.

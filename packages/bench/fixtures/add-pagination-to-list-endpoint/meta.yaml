@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Extend GET /items with page/pageSize query support, cap pageSize at 50, stable ordering, include total in response.
