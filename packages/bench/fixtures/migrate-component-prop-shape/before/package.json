@@ -1,0 +1,6 @@
+{
+  "name": "fixture-migrate-component-prop-shape",
+  "type": "module",
+  "private": true,
+  "devDependencies": { "vitest": "*" }
+}

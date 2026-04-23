@@ -1,0 +1,3 @@
+category: medium
+language: ts
+summary: Rename the Card component's props from {title, body} to {heading, content}, updating callers.

@@ -1,0 +1,1 @@
+Rename the `Card` component's props from `{title, body}` to `{heading, content}`. Update all callers (`src/page.ts`). Do not regress rendering behaviour — `renderPage()` must still return the same string.

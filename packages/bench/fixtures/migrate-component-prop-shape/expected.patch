@@ -1,0 +1,20 @@
+diff --git a/src/card.ts b/src/card.ts
+index e77c761..d187046 100644
+--- a/src/card.ts
++++ b/src/card.ts
+@@ -1,3 +1,3 @@
+-export function Card({ title, body }: { title: string; body: string }) {
+-  return `${title}: ${body}`;
++export function Card({ heading, content }: { heading: string; content: string }) {
++  return `${heading}: ${content}`;
+ }
+diff --git a/src/page.ts b/src/page.ts
+index 6071fb6..63981a2 100644
+--- a/src/page.ts
++++ b/src/page.ts
+@@ -1,4 +1,4 @@
+ import { Card } from "./card.js";
+ export function renderPage() {
+-  return Card({ title: "Hi", body: "World" });
++  return Card({ heading: "Hi", content: "World" });
+ }
