@@ -1,0 +1,24 @@
+diff --git a/src/cli.ts b/src/cli.ts
+index 670570e..017050d 100644
+--- a/src/cli.ts
++++ b/src/cli.ts
+@@ -1,9 +1,18 @@
++function parseName(argv: string[]): string | null {
++  return argv[1] ?? null;
++}
++
+ export function run(argv: string[]): string {
+   const cmd = argv[0];
+   if (cmd === "greet") {
+-    const name = argv[1];
++    const name = parseName(argv);
+     if (!name) return "error: missing name";
+     return `Hello, ${name}!`;
+   }
++  if (cmd === "farewell") {
++    const name = parseName(argv);
++    if (!name) return "error: missing name";
++    return `Goodbye, ${name}!`;
++  }
+   return "unknown command";
+ }

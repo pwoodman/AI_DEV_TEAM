@@ -1,0 +1,1 @@
+Add a `farewell <name>` subcommand to `src/cli.ts`'s `run(argv)` that returns `"Goodbye, <name>!"`. Share argument parsing with the existing `greet` subcommand — do not duplicate the name-extraction logic. Missing name must return an error string.

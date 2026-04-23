@@ -1,0 +1,3 @@
+category: medium
+language: ts
+summary: Add a farewell subcommand sharing the greet argument parser; do not duplicate logic.

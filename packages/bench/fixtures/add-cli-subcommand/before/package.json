@@ -1,0 +1,6 @@
+{
+  "name": "fixture-add-cli-subcommand",
+  "type": "module",
+  "private": true,
+  "devDependencies": { "vitest": "*" }
+}
