@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Implement token-bucket rate limiter middleware with configurable {limit, windowMs}; wire into router.
