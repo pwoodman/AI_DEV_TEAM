@@ -2,13 +2,19 @@ import type { Orchestrator } from "@amase/core";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-export function registerQuestionTools(server: McpServer, orchestrator: Orchestrator): void {
+export function registerQuestionTools(
+  server: McpServer,
+  orchestrator: Orchestrator,
+  resolveDagId?: (runId: string) => string | undefined,
+): void {
   server.tool(
     "amase_clarify",
     "Fetch the next pending user-input question for a run, or null if none.",
     { runId: z.string().min(1) },
     async ({ runId }) => {
-      const q = orchestrator.pendingQuestion(runId);
+      const dagId = resolveDagId?.(runId);
+      const q =
+        orchestrator.pendingQuestion(runId) ?? (dagId ? orchestrator.pendingQuestion(dagId) : null);
       return { content: [{ type: "text", text: JSON.stringify(q) }] };
     },
   );
@@ -22,7 +28,8 @@ export function registerQuestionTools(server: McpServer, orchestrator: Orchestra
       choice: z.union([z.literal(0), z.literal(1), z.literal(2)]),
     },
     async ({ runId, questionId, choice }) => {
-      await orchestrator.answerQuestion({ runId, questionId, choice });
+      const dagId = resolveDagId?.(runId);
+      await orchestrator.answerQuestion({ runId: dagId ?? runId, questionId, choice });
       return { content: [{ type: "text", text: "ok" }] };
     },
   );

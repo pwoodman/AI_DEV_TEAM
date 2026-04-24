@@ -3,22 +3,24 @@ import { listFixtures, loadFixture } from "../src/fixtures.js";
 
 const EXPECTED_IDS = [
   "add-cli-flag",
+  "add-cli-subcommand",
+  "add-http-endpoint",
+  "add-new-validator-to-pipeline",
+  "add-pagination-to-list-endpoint",
   "add-typed-error",
+  "add-validated-endpoint-with-zod",
   "add-zod-schema",
-  "extract-constant",
+  "build-rate-limiter-middleware",
   "fix-failing-vitest",
   "handle-null-input",
-  "refactor-function",
-  "rename-symbol",
+  "migrate-component-prop-shape",
+  "rename-package-export",
 ];
 
 describe("fixtures", () => {
-  it("lists all eight fixtures", async () => {
+  it("lists all curated fixtures", async () => {
     const names = await listFixtures();
-    for (const id of EXPECTED_IDS) {
-      expect(names).toContain(id);
-    }
-    expect(names.length).toBe(EXPECTED_IDS.length);
+    expect(names).toEqual(EXPECTED_IDS);
   });
 
   it("loads a fixture with prompt, before tree, expected patch, tests", async () => {

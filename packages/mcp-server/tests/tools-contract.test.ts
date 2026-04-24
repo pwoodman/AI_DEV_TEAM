@@ -4,6 +4,49 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { type McpClient, callTool, spawnMcp } from "./contract-helpers.js";
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForDone(
+  client: McpClient,
+  runId: string,
+  timeoutMs = 6_000,
+): Promise<{
+  state: string;
+  nodes: Array<{
+    id: string;
+    status: string;
+    retries: number;
+    tokensIn: number;
+    tokensOut: number;
+  }>;
+}> {
+  const deadline = Date.now() + timeoutMs;
+  let last: { state: string; nodes: Array<{ id: string; status: string }> } | undefined;
+  while (Date.now() < deadline) {
+    last = await callTool<{ state: string; nodes: Array<{ id: string; status: string }> }>(
+      client,
+      "amase_status",
+      { runId },
+    );
+    if (last.state === "done" || last.state === "failed") {
+      return last as {
+        state: string;
+        nodes: Array<{
+          id: string;
+          status: string;
+          retries: number;
+          tokensIn: number;
+          tokensOut: number;
+        }>;
+      };
+    }
+    await sleep(100);
+  }
+  throw new Error(`timed out waiting for run ${runId}; last state=${last?.state ?? "unknown"}`);
+}
+
 describe("MCP contract: tool-by-tool", () => {
   let client: McpClient;
   let workspace: string;
@@ -74,28 +117,35 @@ describe("MCP contract: tool-by-tool", () => {
 
   describe("amase_execute + amase_status + amase_artifacts", () => {
     it("execute returns runId", async () => {
+      const start = Date.now();
       const exec = await callTool<{ runId: string }>(client, "amase_execute", {
         dagId: planDagId,
       });
+      expect(Date.now() - start).toBeLessThan(1000);
       expect(exec.runId).toBeTypeOf("string");
       execRunId = exec.runId;
     });
 
     it("status eventually reports done", async () => {
-      const status = await callTool<{
-        state: string;
-        nodes: Array<{ id: string; status: string }>;
-      }>(client, "amase_status", { runId: execRunId });
-      expect(["running", "done"]).toContain(status.state);
+      const status = await waitForDone(client, execRunId);
+      expect(status.state).toBe("done");
       expect(Array.isArray(status.nodes)).toBe(true);
+      for (const n of status.nodes) {
+        expect(n.retries).toBeTypeOf("number");
+        expect(n.tokensIn).toBeTypeOf("number");
+        expect(n.tokensOut).toBeTypeOf("number");
+      }
     });
 
     it("artifacts include workspace path + decision log with validator events", async () => {
+      await waitForDone(client, execRunId);
       const art = await callTool<{
         workspace: string;
+        patches: Array<{ nodeId: string; path: string; op: string; bytes: number }>;
         log: Array<{ event: string; data: Record<string, unknown> }>;
       }>(client, "amase_artifacts", { runId: execRunId });
       expect(art.workspace).toMatch(/runs[\\/].+[\\/]workspace$/);
+      expect(Array.isArray(art.patches)).toBe(true);
       expect(Array.isArray(art.log)).toBe(true);
       const events = art.log.map((e) => e.event);
       expect(events).toContain("node.started");

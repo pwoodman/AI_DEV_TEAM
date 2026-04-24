@@ -22,11 +22,13 @@ export async function runValidatorChain(
   ctx: ValidatorContext,
   validators: Validator[],
 ): Promise<ChainOutcome> {
-  const results: ValidationResult[] = [];
-  for (const v of validators) {
-    const r = await v.run(output, ctx);
-    results.push(r);
-    if (!r.ok) return { ok: false, results, firstFailure: r };
-  }
-  return { ok: true, results };
+  // Run all validators in parallel — they are independent CPU-bound checks.
+  // Collect results; short-circuit on first failure only for the final outcome.
+  const results = await Promise.all(validators.map((v) => v.run(output, ctx)));
+  const firstFailure = results.find((r) => !r.ok);
+  return {
+    ok: !firstFailure,
+    results,
+    firstFailure,
+  };
 }

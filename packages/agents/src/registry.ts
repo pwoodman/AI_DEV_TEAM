@@ -10,11 +10,28 @@ import { RefactorAgent } from "./refactor.js";
 import { SecurityAgent } from "./security.js";
 import { TestGenAgent } from "./test-gen.js";
 import { UiTestAgent } from "./ui-test.js";
+import {
+  buildSkillGuideCache,
+  recordPatchQuality,
+  recordSkillFailure,
+  recordSkillSuccess,
+  type QualityRecord,
+} from "./shared/cache.js";
+
+export {
+  recordSkillFailure,
+  recordSkillSuccess,
+  recordPatchQuality,
+};
+export type { QualityRecord };
 
 export function buildAgentRegistry(
   llm: LlmClient,
   astIndex?: ASTIndexLike,
 ): Record<AgentKind, BaseAgent> {
+  // Warm caches in the background — non-blocking
+  void buildSkillGuideCache();
+
   return {
     architect: new ArchitectAgent(llm, astIndex),
     backend: new BackendAgent(llm, astIndex),

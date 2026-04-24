@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { listFixtures, loadFixture } from "../src/fixtures.js";
 
 describe("fixture meta & coverage", () => {
-  // TODO(Task 4): un-skip when medium+large fixtures land.
-  it.skip("has exactly 5 micro + 5 medium + 3 large fixtures", async () => {
+  it("has exactly 5 micro + 5 medium + 3 large fixtures", async () => {
     const ids = await listFixtures();
     const metas = await Promise.all(
       ids.map(async (id) => (await loadFixture(id)).meta),

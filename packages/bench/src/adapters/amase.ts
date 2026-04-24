@@ -213,7 +213,7 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
 
     const contextFiles = pickContextFiles(fx.beforeTree);
     const llm: LlmClient = opts.live
-      ? new AnthropicClient()
+      ? new AnthropicClient({ model: opts.model })
       : new StubLlmClient(buildStubResponder(workspace, fx.prompt, contextFiles));
     const agents = buildAgentRegistry(llm);
     const store = new DAGStore();

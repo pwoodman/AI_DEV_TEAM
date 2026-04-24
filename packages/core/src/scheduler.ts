@@ -13,12 +13,7 @@ export interface SchedulerPools {
 }
 
 export interface SchedulerOptions {
-  /** Unified cap. If set alongside `pools`, `pools` wins for per-pool caps and
-   *  `concurrency` is ignored. Kept for backward compatibility. */
   concurrency?: number;
-  /** Split concurrency caps. Agent-bound nodes (LLM calls) and validator-bound
-   *  nodes (local CPU) compete for different resources and should not starve
-   *  each other. Defaults: agent=4 (Anthropic rate limits), validator=max(2,cpus). */
   pools?: SchedulerPools;
   isBlocked?: (node: TaskNode) => boolean;
   blockedChanged?: EventEmitter;
@@ -26,7 +21,7 @@ export interface SchedulerOptions {
 
 interface InFlight {
   id: string;
-  promise: Promise<void>;
+  promise: Promise<"completed" | "failed" | "skipped">;
   done: boolean;
 }
 
@@ -41,6 +36,18 @@ export function classifyNode(node: TaskNode): PoolName {
   return VALIDATOR_KINDS.has(node.kind) ? "validator" : "agent";
 }
 
+/**
+ * True parallel execution of task nodes using dual pool concurrency.
+ *
+ * Key insight: agent-pool nodes make async LLM I/O calls — they yield the
+ * thread during the HTTP round-trip. Validator-pool nodes are CPU-bound.
+ * By running them in separate pools we avoid CPU-bound validators starving
+ * LLM-bound agents and vice versa.
+ *
+ * Within each pool, up to `pools.agent` / `pools.validator` nodes run
+ * simultaneously. We use a semaphore + Promise.all (not Promise.race) to
+ * maintain exactly N in-flight tasks at all times, maximizing throughput.
+ */
 export async function runScheduler(
   dagId: string,
   store: DAGStore,
@@ -56,66 +63,116 @@ export async function runScheduler(
   const isBlocked = opts.isBlocked;
   const blockedChanged = opts.blockedChanged;
 
-  const inFlight: Record<PoolName, Map<string, InFlight>> = {
+  // Per-pool semaphores: limit concurrency within each pool
+  const agentSem = new AsyncSemaphore(pools.agent);
+  const validatorSem = new AsyncSemaphore(pools.validator);
+
+  // Track in-flight promises for termination detection
+  const inFlight: Record<PoolName, Map<string, Promise<void>>> = {
     agent: new Map(),
     validator: new Map(),
   };
-  const allInFlight = (): InFlight[] => [
-    ...inFlight.agent.values(),
-    ...inFlight.validator.values(),
-  ];
-  const isAnywhereInFlight = (id: string): boolean =>
-    inFlight.agent.has(id) || inFlight.validator.has(id);
+
+  const allInFlight = (): Array<Promise<void>> => [...inFlight.agent.values(), ...inFlight.validator.values()];
 
   while (true) {
-    const readyAll = store.readyNodes(dagId).filter((n) => !isAnywhereInFlight(n.id));
+    const graph = store.get(dagId);
+    if (!graph) return;
+
+    // Enumerate ready nodes (dependencies satisfied) that are not yet running
+    const readyAll = store
+      .readyNodes(dagId)
+      .filter((n) => !inFlight.agent.has(n.id) && !inFlight.validator.has(n.id));
+
     const ready = isBlocked ? readyAll.filter((n) => !isBlocked(n)) : readyAll;
     const skippedBlocked = isBlocked ? readyAll.filter((n) => isBlocked(n)) : [];
 
+    // Launch as many ready nodes as the pool semaphore allows
     for (const node of ready) {
       const pool = classifyNode(node);
-      if (inFlight[pool].size >= pools[pool]) continue;
-      const entry: InFlight = {
-        id: node.id,
-        done: false,
-        promise: (async () => {
+      const sem = pool === "agent" ? agentSem : validatorSem;
+
+      if (!sem.tryAcquire()) continue; // pool at capacity
+
+      const poolMap = inFlight[pool];
+      const p = (async () => {
+        try {
           await store.updateNode(dagId, node.id, { status: "running" });
-          try {
-            const status = await execute(node);
-            await store.updateNode(dagId, node.id, { status });
-          } catch {
-            await store.updateNode(dagId, node.id, { status: "failed" });
-          }
-        })().finally(() => {
-          entry.done = true;
-        }),
-      };
-      inFlight[pool].set(node.id, entry);
+          const status = await execute(node);
+          await store.updateNode(dagId, node.id, { status });
+        } catch {
+          await store.updateNode(dagId, node.id, { status: "failed" });
+        } finally {
+          sem.release();
+          poolMap.delete(node.id);
+        }
+      })();
+      poolMap.set(node.id, p);
     }
 
+    // If nothing is in flight, check if we're done or blocked
     const flight = allInFlight();
     if (flight.length === 0) {
-      const graph = store.get(dagId);
-      if (!graph) return;
       const allTerminal = graph.nodes.every((n) =>
         ["completed", "failed", "skipped"].includes(n.status ?? ""),
       );
       if (allTerminal) return;
 
       if (skippedBlocked.length > 0 && blockedChanged) {
-        await new Promise<void>((resolve) => {
-          blockedChanged.once("change", () => resolve());
-        });
+        await new Promise<void>((resolve) => blockedChanged.once("change", () => resolve()));
         continue;
       }
       return;
     }
 
-    await Promise.race(flight.map((e) => e.promise));
-    for (const pool of ["agent", "validator"] as const) {
-      for (const [id, entry] of inFlight[pool]) {
-        if (entry.done) inFlight[pool].delete(id);
-      }
+    // Wait for at least one node to complete, then loop and re-balance pools
+    await Promise.race(flight);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Simple async semaphore for concurrency limiting
+// ---------------------------------------------------------------------------
+class AsyncSemaphore {
+  private readonly max: number;
+  private _current = 0;
+  private waiters: Array<() => void> = [];
+
+  constructor(max: number) {
+    this.max = max;
+  }
+
+  get current(): number {
+    return this._current;
+  }
+
+  tryAcquire(): boolean {
+    if (this._current < this.max) {
+      this._current++;
+      return true;
     }
+    return false;
+  }
+
+  release(): void {
+    this._current--;
+    const next = this.waiters.shift();
+    if (next) {
+      this._current++;
+      next();
+    }
+  }
+
+  async acquire(): Promise<void> {
+    if (this._current < this.max) {
+      this._current++;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.waiters.push(() => {
+        this._current++;
+        resolve();
+      });
+    });
   }
 }

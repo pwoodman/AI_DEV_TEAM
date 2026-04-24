@@ -1,10 +1,24 @@
-# Dockerize
+add something for regex# Dockerize
 
-- Multi-stage builds: fat builder, slim runtime. Final image has no compilers, no dev deps.
-- Pin base image to a digest or specific version tag, not `:latest`.
-- Run as a non-root user (`USER app`). Create the user in the image.
-- `.dockerignore` excludes `node_modules`, `.git`, `.env`, test fixtures, build artifacts.
-- One process per container. Use an init (`tini`) if you fork subprocesses.
-- `HEALTHCHECK` defined. Expose only the ports you use.
-- Cache layers deliberately: dependency install before source copy, so source changes don't invalidate deps.
-- Image scanned (Trivy/Grype) in CI; critical CVEs block the build.
+## Scope
+
+Secure, small, reproducible, and efficient production container images with minimal attack surface.
+
+## Non-negotiables
+
+- Multi-stage builds produce minimal runtime images without compilers, dev tools, or build artifacts. Final stage contains only runtime dependencies and application binaries.
+- Base images are pinned by version or digest, never `:latest`. Document the base image update process and scan for CVEs before adoption.
+- Containers run as non-root with explicit `USER` directive. Use distroless, scratch, or dedicated non-root base images. Drop all capabilities except required ones.
+- `.dockerignore` excludes secrets, VCS metadata (`.git`), dependencies (`node_modules` if built), test artifacts, and local config files. Prevent context bloat and secret leakage.
+- Health checks (`HEALTHCHECK`) and explicit exposed ports are defined. Health check should validate application functionality, not just process existence.
+- CI image scans (Trivy, Snyk, Clair, Grype) block on critical vulnerabilities. Define SLA for CVE remediation (e.g., critical: 24h, high: 7 days).
+- Build arguments and labels include: version, git commit, build timestamp. Never pass secrets as build args unless using BuildKit secret mounts.
+- Layer order optimizes cache reuse: stable dependencies before application source. Copy `package.json`/`lockfile` before `npm install`, then copy source last.
+
+## Review checks
+
+- Runtime image contains only required binaries/assets (no `curl`, `wget`, `ssh`, `gcc`, `git`).
+- Image size is monitored; alert on unexpected growth.
+- No secrets in image layers (scan with `dive` or `docker history`).
+- Health check endpoint validates database connectivity and critical dependencies.
+- Rebuild from scratch reproduces identical functional behavior (deterministic build).

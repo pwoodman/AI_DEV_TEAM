@@ -54,6 +54,33 @@ class McpClient {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForDone(
+  client: McpClient,
+  runId: string,
+  timeoutMs = 6_000,
+): Promise<{ state: string; nodes: Array<{ status: string }> }> {
+  const deadline = Date.now() + timeoutMs;
+  let last: { state: string } | undefined;
+  while (Date.now() < deadline) {
+    const statusRes = (await client.request("tools/call", {
+      name: "amase_status",
+      arguments: { runId },
+    })) as { content: Array<{ text: string }> };
+    const status = JSON.parse(statusRes.content[0].text) as {
+      state: string;
+      nodes: Array<{ status: string }>;
+    };
+    last = status;
+    if (status.state === "done" || status.state === "failed") return status;
+    await sleep(100);
+  }
+  throw new Error(`timed out waiting for run ${runId}; last=${last?.state ?? "unknown"}`);
+}
+
 describe("MCP stdio roundtrip", () => {
   let child: ChildProcess;
   let client: McpClient;
@@ -112,11 +139,7 @@ describe("MCP stdio roundtrip", () => {
     const exec = JSON.parse(execRes.content[0].text);
     expect(exec.runId).toBeTypeOf("string");
 
-    const statusRes = (await client.request("tools/call", {
-      name: "amase_status",
-      arguments: { runId: exec.runId },
-    })) as { content: Array<{ text: string }> };
-    const status = JSON.parse(statusRes.content[0].text);
+    const status = await waitForDone(client, exec.runId);
     expect(status.state).toBe("done");
     expect(status.nodes.every((n: { status: string }) => n.status === "completed")).toBe(true);
 

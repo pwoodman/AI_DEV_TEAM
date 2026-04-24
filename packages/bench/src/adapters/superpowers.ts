@@ -7,6 +7,7 @@ import type { BenchResult, RunOpts } from "../types.js";
 
 const BENCH_WORKSPACES_DIR = join(process.cwd(), ".amase", "bench-workspaces");
 const FIXTURE_TEST_TIMEOUT_MS = 90_000;
+const CLAUDE_MAX_ATTEMPTS = 3;
 
 async function materializeTree(dest: string, tree: Map<string, string>): Promise<void> {
   for (const [rel, content] of tree) {
@@ -161,28 +162,35 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     // is required for non-interactive fixture runs (no acceptAll option exists).
     let stdoutBuf = "";
     let stderrBuf = "";
-    const command =
-      "claude --print --output-format=stream-json --verbose --permission-mode=bypassPermissions";
-    await new Promise<void>((resolve) => {
-      const child = exec(
-        command,
-        {
-          cwd: workspace,
-          env: process.env,
-          maxBuffer: 10 * 1024 * 1024,
-        },
-        (err, stdout, stderr) => {
-          stdoutBuf = stdout;
-          stderrBuf = stderr;
-          if (err) {
-            error = (err as Error).message;
-          }
-          resolve();
-        },
-      );
-      child.stdin?.write(fx.prompt);
-      child.stdin?.end();
-    });
+    const command = `claude --model ${opts.model} --print --output-format=stream-json --verbose --permission-mode=bypassPermissions`;
+    for (let attempt = 0; attempt < CLAUDE_MAX_ATTEMPTS; attempt++) {
+      stdoutBuf = "";
+      stderrBuf = "";
+      error = undefined;
+      await new Promise<void>((resolve) => {
+        const child = exec(
+          command,
+          {
+            cwd: workspace,
+            env: process.env,
+            maxBuffer: 10 * 1024 * 1024,
+          },
+          (err, stdout, stderr) => {
+            stdoutBuf = stdout;
+            stderrBuf = stderr;
+            if (err) {
+              error = (err as Error).message;
+            }
+            resolve();
+          },
+        );
+        child.stdin?.write(fx.prompt);
+        child.stdin?.end();
+      });
+      if (!error) break;
+      if (attempt >= CLAUDE_MAX_ATTEMPTS - 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 300 * 2 ** attempt));
+    }
 
     for (const line of stdoutBuf.split(/\r?\n/)) {
       const trimmed = line.trim();

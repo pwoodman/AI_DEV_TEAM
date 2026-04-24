@@ -4,6 +4,26 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForDone(client, runId, timeoutMs = 6000) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    const statusRes = await client.request("tools/call", {
+      name: "amase_status",
+      arguments: { runId },
+    });
+    const status = JSON.parse(statusRes.content[0].text);
+    last = status;
+    if (status.state === "done" || status.state === "failed") return status;
+    await sleep(100);
+  }
+  throw new Error(`status timeout waiting for ${runId}; last=${last?.state ?? "unknown"}`);
+}
+
 // Minimal MCP client over stdio: JSON-RPC 2.0, newline-delimited.
 class McpStdioClient {
   constructor(child) {
@@ -90,14 +110,10 @@ try {
   const exec = JSON.parse(execRes.content[0].text);
   console.log("execute:", exec);
 
-  const statusRes = await client.request("tools/call", {
-    name: "amase_status",
-    arguments: { runId: exec.runId },
-  });
-  const status = JSON.parse(statusRes.content[0].text);
+  const status = await waitForDone(client, exec.runId);
   console.log("status:", {
     state: status.state,
-    nodes: status.nodes.map((n) => `${n.id}:${n.status}`),
+    nodes: status.nodes.map((n) => `${n.id}:${n.status} in=${n.tokensIn} out=${n.tokensOut}`),
   });
 
   const artifactsRes = await client.request("tools/call", {
@@ -106,6 +122,7 @@ try {
   });
   const artifacts = JSON.parse(artifactsRes.content[0].text);
   console.log(`artifacts: workspace=${artifacts.workspace}`);
+  console.log(`artifacts: patches=${artifacts.patches.length}`);
   console.log(`artifacts: events=${artifacts.log.map((e) => e.event).join(" -> ")}`);
 
   const expected = ["amase_plan", "amase_execute", "amase_status", "amase_artifacts"];

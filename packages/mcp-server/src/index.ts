@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { buildAgentRegistry } from "@amase/agents";
-import type { AgentKind, Language } from "@amase/contracts";
+import type { AgentKind, DecisionLogEntry, Language } from "@amase/contracts";
 import { Orchestrator } from "@amase/core";
 import { AnthropicClient, type LlmClient, StubLlmClient } from "@amase/llm";
 import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
@@ -87,10 +88,81 @@ function buildValidators(): Validator[] {
   ];
 }
 
+interface ActiveRun {
+  dagId: string;
+  state: "running" | "done" | "failed";
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+}
+
+interface NodeRuntimeMetrics {
+  retries: number;
+  tokensIn: number;
+  tokensOut: number;
+}
+
+interface ArtifactPatchSummary {
+  nodeId: string;
+  path: string;
+  op: "create" | "modify" | "delete";
+  bytes: number;
+}
+
+function aggregateNodeMetrics(entries: DecisionLogEntry[]): Map<string, NodeRuntimeMetrics> {
+  const byNode = new Map<string, NodeRuntimeMetrics>();
+  const ensure = (nodeId: string): NodeRuntimeMetrics => {
+    const existing = byNode.get(nodeId);
+    if (existing) return existing;
+    const created: NodeRuntimeMetrics = { retries: 0, tokensIn: 0, tokensOut: 0 };
+    byNode.set(nodeId, created);
+    return created;
+  };
+
+  for (const entry of entries) {
+    if (entry.nodeId.startsWith("<")) continue;
+    if (entry.event === "node.retried") {
+      ensure(entry.nodeId).retries += 1;
+      continue;
+    }
+    if (entry.event === "llm.call") {
+      const m = ensure(entry.nodeId);
+      const tokensIn = typeof entry.data.tokensIn === "number" ? entry.data.tokensIn : 0;
+      const tokensOut = typeof entry.data.tokensOut === "number" ? entry.data.tokensOut : 0;
+      m.tokensIn += tokensIn;
+      m.tokensOut += tokensOut;
+    }
+  }
+
+  return byNode;
+}
+
+function collectPatchSummaries(entries: DecisionLogEntry[]): ArtifactPatchSummary[] {
+  const out: ArtifactPatchSummary[] = [];
+  for (const entry of entries) {
+    if (entry.event !== "node.completed") continue;
+    const patches = entry.data.patches;
+    if (!Array.isArray(patches)) continue;
+    for (const raw of patches) {
+      if (!raw || typeof raw !== "object") continue;
+      const patch = raw as { path?: unknown; op?: unknown; bytes?: unknown };
+      if (typeof patch.path !== "string") continue;
+      if (patch.op !== "create" && patch.op !== "modify" && patch.op !== "delete") continue;
+      out.push({
+        nodeId: entry.nodeId,
+        path: patch.path,
+        op: patch.op,
+        bytes: typeof patch.bytes === "number" ? patch.bytes : 0,
+      });
+    }
+  }
+  return out;
+}
+
 const llm = buildLlm();
 const agents = buildAgentRegistry(llm);
 const store = new DAGStore();
-const activeRuns = new Map<string, { dagId: string }>();
+const activeRuns = new Map<string, ActiveRun>();
 
 const orchestrator = new Orchestrator({
   agents,
@@ -124,9 +196,48 @@ server.tool(
     dagId: z.string().min(1),
     approveAll: z.boolean().optional(),
   },
-  async ({ dagId }) => {
-    const { runId } = await orchestrator.execute(dagId);
-    activeRuns.set(runId, { dagId });
+  async ({ dagId, approveAll }) => {
+    if (!store.get(dagId)) {
+      return { content: [{ type: "text", text: JSON.stringify({ error: "unknown dagId" }) }] };
+    }
+
+    const runId = randomUUID();
+    activeRuns.set(runId, {
+      dagId,
+      state: "running",
+      startedAt: new Date().toISOString(),
+    });
+
+    if (approveAll) {
+      // Questions are currently keyed by dagId during planning; auto-answer
+      // against that run key before execution starts.
+      while (true) {
+        const q = orchestrator.pendingQuestion(dagId);
+        if (!q) break;
+        await orchestrator.answerQuestion({
+          runId: dagId,
+          questionId: q.questionId,
+          choice: q.recommended,
+        });
+      }
+    }
+
+    void orchestrator.execute(dagId, {}, runId).then(
+      () => {
+        const current = activeRuns.get(runId);
+        if (!current) return;
+        current.state = "done";
+        current.finishedAt = new Date().toISOString();
+      },
+      (err) => {
+        const current = activeRuns.get(runId);
+        if (!current) return;
+        current.state = "failed";
+        current.finishedAt = new Date().toISOString();
+        current.error = err instanceof Error ? err.message : String(err);
+      },
+    );
+
     return { content: [{ type: "text", text: JSON.stringify({ runId }) }] };
   },
 );
@@ -146,21 +257,32 @@ server.tool(
     }
     const paths = runPaths(graph.workspacePath, entry.dagId);
     const log = new DecisionLog(paths.decisions);
+    const allLog = await log.readAll();
     const logTail = await log.tail(20);
+    const metricsByNode = aggregateNodeMetrics(allLog);
     const allTerminal = graph.nodes.every(
       (n) => n.status === "completed" || n.status === "failed" || n.status === "skipped",
     );
+    const state =
+      entry.state === "failed"
+        ? "failed"
+        : entry.state === "running" && !allTerminal
+          ? "running"
+          : "done";
     return {
       content: [
         {
           type: "text",
           text: JSON.stringify(
             {
-              state: allTerminal ? "done" : "running",
+              state,
+              error: entry.error,
               nodes: graph.nodes.map((n) => ({
                 id: n.id,
                 status: n.status ?? "pending",
-                retries: n.retries ?? 0,
+                retries: metricsByNode.get(n.id)?.retries ?? n.retries ?? 0,
+                tokensIn: metricsByNode.get(n.id)?.tokensIn ?? 0,
+                tokensOut: metricsByNode.get(n.id)?.tokensOut ?? 0,
               })),
               logTail,
             },
@@ -189,11 +311,22 @@ server.tool(
     const paths = runPaths(graph.workspacePath, entry.dagId);
     const log = new DecisionLog(paths.decisions);
     const all = await log.readAll();
+    const patches = collectPatchSummaries(all);
     return {
       content: [
         {
           type: "text",
-          text: JSON.stringify({ workspace: paths.workspace, log: all }, null, 2),
+          text: JSON.stringify(
+            {
+              workspace: paths.workspace,
+              state: entry.state,
+              error: entry.error,
+              patches,
+              log: all,
+            },
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -232,7 +365,7 @@ server.tool(
   },
 );
 
-registerQuestionTools(server, orchestrator);
+registerQuestionTools(server, orchestrator, (runId) => activeRuns.get(runId)?.dagId);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
