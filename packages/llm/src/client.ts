@@ -98,7 +98,7 @@ export class AnthropicClient implements LlmClient {
         // If we have a cache checkpoint for this partition, use it.
         // Anthropic will bill only for tokens AFTER the checkpoint.
         if (req.cacheCheckpoint) {
-          extra["cache_checkpoint"] = req.cacheCheckpoint;
+          extra.cache_checkpoint = req.cacheCheckpoint;
         }
 
         res = (await this.client.messages.create({

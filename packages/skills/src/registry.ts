@@ -2,25 +2,25 @@ import type { AgentKind, Language, Patch, ValidationResult } from "@amase/contra
 import { loadGuide } from "./loader.js";
 import type { Skill, SkillAppliesTo } from "./types.js";
 
+import { check as apiIntegrationCheck } from "./skills/backend/api-integration/check.js";
 // Backend
 import { check as asyncJobsCheck } from "./skills/backend/async-jobs/check.js";
 import { check as backendDataModelCheck } from "./skills/backend/data-model/check.js";
-import { check as backendRestApiCheck } from "./skills/backend/rest-api/check.js";
-import { check as apiIntegrationCheck } from "./skills/backend/api-integration/check.js";
 import { check as databaseFlavorsCheck } from "./skills/backend/database-flavors/check.js";
+import { check as backendRestApiCheck } from "./skills/backend/rest-api/check.js";
 
+import { check as frontendAccessibilityCheck } from "./skills/frontend/accessibility/check.js";
 // Frontend
 import { check as componentDesignCheck } from "./skills/frontend/component-design/check.js";
-import { check as frontendAccessibilityCheck } from "./skills/frontend/accessibility/check.js";
 import { check as frontendPerformanceCheck } from "./skills/frontend/performance/check.js";
 import { check as stateManagementCheck } from "./skills/frontend/state-management/check.js";
 
 // Languages
 import { check as langGoCheck } from "./skills/lang/go/check.js";
 import { check as langPythonCheck } from "./skills/lang/python/check.js";
-import { check as langTypeScriptCheck } from "./skills/lang/typescript/check.js";
-import { check as sqlCheck } from "./skills/lang/sql/check.js";
 import { check as regexCheck } from "./skills/lang/regex/check.js";
+import { check as sqlCheck } from "./skills/lang/sql/check.js";
+import { check as langTypeScriptCheck } from "./skills/lang/typescript/check.js";
 
 // Security
 import { check as securitySecretsCheck } from "./skills/security/secrets/check.js";
@@ -33,9 +33,9 @@ import { check as observabilityCheck } from "./skills/deployment/observability/c
 import { check as integrationTestingCheck } from "./skills/testing/integration-testing/check.js";
 import { check as unitTestingCheck } from "./skills/testing/unit-testing/check.js";
 
+import { check as diagrammingCheck } from "./skills/architecture/diagramming/check.js";
 // Architecture
 import { check as eventDrivenCheck } from "./skills/architecture/event-driven/check.js";
-import { check as diagrammingCheck } from "./skills/architecture/diagramming/check.js";
 
 // Performance
 import { check as cachingCheck } from "./skills/performance/caching/check.js";
@@ -63,11 +63,9 @@ export const ALL_SKILLS: Skill[] = [
     { kinds: ["backend"] },
     asyncJobsCheck,
   ),
-  skill(
-    "backend/design",
-    "System design: APIs, data, consistency, scaling, SLOs, security",
-    { kinds: ["backend", "architect"] },
-  ),
+  skill("backend/design", "System design: APIs, data, consistency, scaling, SLOs, security", {
+    kinds: ["backend", "architect"],
+  }),
   skill(
     "backend/data-model",
     "Data model + migration safety",
@@ -237,12 +235,13 @@ export async function runSkillChecks(
   patches: Patch[],
   ctx: { workspacePath: string; allowedPaths: string[]; language?: Language },
 ): Promise<ValidationResult[]> {
-  return Promise.all(
+  const results = await Promise.all(
     skills
       .filter((s) => !!s.check)
       .map(async (s) => {
-        const result = await s.check!(patches, ctx);
-        return result;
+        if (!s.check) return null;
+        return s.check(patches, ctx);
       }),
   );
+  return results.filter((r): r is ValidationResult => r !== null);
 }

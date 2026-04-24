@@ -38,8 +38,8 @@ let _promptTemplateCache: Map<string, string> | null = null;
 export async function getCachedPromptTemplate(kind: AgentKind): Promise<string | undefined> {
   if (_promptTemplateCache) return _promptTemplateCache.get(`${kind}:`);
   const { loadTemplate, renderTemplate } = await import("@amase/llm");
-  const { fileURLToPath } = await import("url");
-  const { dirname, join } = await import("path");
+  const { fileURLToPath } = await import("node:url");
+  const { dirname, join } = await import("node:path");
   const __dirname = dirname(fileURLToPath(import.meta.url));
 
   const agents: Array<{ kind: AgentKind; promptFile: string }> = [
@@ -56,7 +56,7 @@ export async function getCachedPromptTemplate(kind: AgentKind): Promise<string |
 
   _promptTemplateCache = new Map();
   for (const a of agents) {
-    const tmpl = await loadTemplate(join(__dirname, "prompts", a.promptFile));
+    const tmpl = await loadTemplate(join(__dirname, "..", "prompts", a.promptFile));
     _promptTemplateCache.set(`${a.kind}:`, renderTemplate(tmpl, { kind: a.kind }));
   }
   return _promptTemplateCache.get(`${kind}:`);
@@ -73,28 +73,46 @@ function _failureKey(k: AgentKind, lang: Language | undefined, skillId: string):
 
 const _failureCounts = new Map<string, number>();
 
-export function recordSkillFailure(kind: AgentKind, language: Language | undefined, skillId: string): void {
+export function recordSkillFailure(
+  kind: AgentKind,
+  language: Language | undefined,
+  skillId: string,
+): void {
   const k = _failureKey(kind, language, skillId);
   _failureCounts.set(k, (_failureCounts.get(k) ?? 0) + 1);
 }
 
-export function recordSkillSuccess(kind: AgentKind, language: Language | undefined, skillId: string): void {
+export function recordSkillSuccess(
+  kind: AgentKind,
+  language: Language | undefined,
+  skillId: string,
+): void {
   const k = _failureKey(kind, language, skillId);
   _failureCounts.set(k, 0);
 }
 
-export function isSkillSuppressed(kind: AgentKind, language: Language | undefined, skillId: string): boolean {
-  return (_failureCounts.get(_failureKey(kind, language, skillId)) ?? 0) >= MAX_CONSECUTIVE_FAILURES;
+export function isSkillSuppressed(
+  kind: AgentKind,
+  language: Language | undefined,
+  skillId: string,
+): boolean {
+  return (
+    (_failureCounts.get(_failureKey(kind, language, skillId)) ?? 0) >= MAX_CONSECUTIVE_FAILURES
+  );
 }
 
-export function filterSkills(skills: Skill[], kind: AgentKind, language: Language | undefined): Skill[] {
+export function filterSkills(
+  skills: Skill[],
+  kind: AgentKind,
+  language: Language | undefined,
+): Skill[] {
   return skills.filter((s) => !isSkillSuppressed(kind, language, s.id));
 }
 
 // ---------------------------------------------------------------------------
 // Patch quality memory — rolling per (kind, language)
 // ---------------------------------------------------------------------------
-interface QualityRecord {
+export interface QualityRecord {
   total: number;
   passCount: number;
   avgDiffSimilarity: number;
@@ -122,7 +140,10 @@ export function recordPatchQuality(
   });
 }
 
-export function getQualityRecord(kind: AgentKind, language: Language | undefined): QualityRecord | undefined {
+export function getQualityRecord(
+  kind: AgentKind,
+  language: Language | undefined,
+): QualityRecord | undefined {
   return _qualityMap.get(_qualityKey(kind, language));
 }
 

@@ -20,7 +20,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (REAL_HTTP_CALLS.test(content) && !MOCK_EXTERNAL.test(content)) {
       issues.push({
         file: p.path,
-        message: "Real HTTP calls detected in integration test. Stub external APIs with nock, WireMock, or VCR.",
+        message:
+          "Real HTTP calls detected in integration test. Stub external APIs with nock, WireMock, or VCR.",
         severity: "error",
       });
     }
@@ -33,18 +34,26 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
       });
     }
 
-    if (/\b(sequelize|prisma|sqlalchemy|gorm|db\.query)\b/i.test(content) && !DB_CLEANUP.test(content)) {
+    if (
+      /\b(sequelize|prisma|sqlalchemy|gorm|db\.query)\b/i.test(content) &&
+      !DB_CLEANUP.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Database interaction without cleanup/rollback. Ensure test data is removed after each test.",
+        message:
+          "Database interaction without cleanup/rollback. Ensure test data is removed after each test.",
         severity: "warning",
       });
     }
 
-    if (/\bINSERT\s+INTO|CREATE\s+TABLE|DROP\s+TABLE/i.test(content) && !TESTCONTAINER.test(content)) {
+    if (
+      /\bINSERT\s+INTO|CREATE\s+TABLE|DROP\s+TABLE/i.test(content) &&
+      !TESTCONTAINER.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Direct DDL/DML in integration test without testcontainers or ephemeral database. Use isolated test databases.",
+        message:
+          "Direct DDL/DML in integration test without testcontainers or ephemeral database. Use isolated test databases.",
         severity: "warning",
       });
     }

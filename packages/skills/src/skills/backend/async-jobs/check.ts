@@ -15,10 +15,15 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (p.op === "delete") continue;
     const content = p.content;
 
-    if (FETCH_ORGANIC.test(content) && !IDEMPOTENCY_KEY.test(content) && !RETRY_HANDLER.test(content)) {
+    if (
+      FETCH_ORGANIC.test(content) &&
+      !IDEMPOTENCY_KEY.test(content) &&
+      !RETRY_HANDLER.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Async function detected but no idempotency or retry pattern found. Add an idempotency key or retry handler.",
+        message:
+          "Async function detected but no idempotency or retry pattern found. Add an idempotency key or retry handler.",
         severity: "warning",
       });
     }
@@ -31,10 +36,14 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
       });
     }
 
-    if (RETRY_HANDLER.test(content) && !/jitter|backoff|exponential|linear/.test(content.toLowerCase())) {
+    if (
+      RETRY_HANDLER.test(content) &&
+      !/jitter|backoff|exponential|linear/.test(content.toLowerCase())
+    ) {
       issues.push({
         file: p.path,
-        message: "Retry logic detected but no backoff strategy (jitter, exponential, linear). Use a backoff formula to avoid thundering herd.",
+        message:
+          "Retry logic detected but no backoff strategy (jitter, exponential, linear). Use a backoff formula to avoid thundering herd.",
         severity: "warning",
       });
     }

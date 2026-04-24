@@ -4,9 +4,10 @@ import type { Stats } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { ArchitectAgent, BaseAgent } from "@amase/agents";
+import { filterSkills, qualityConfidence, recordPatchQuality } from "@amase/agents";
 import type {
-  AgentKind,
   AgentInput,
+  AgentKind,
   FeatureRequest,
   Patch,
   TaskGraph,
@@ -14,6 +15,7 @@ import type {
   UserAnswer,
   UserQuestion,
 } from "@amase/contracts";
+import { getPartitionCache, partitionKey, setPartitionCache } from "@amase/llm";
 import {
   type ASTIndex,
   type DAGStore,
@@ -33,28 +35,28 @@ import { type RouterOptions, routeNode } from "./router.js";
 import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
 import { isBlockedByQuestion } from "./speculative.js";
-import {
-  getPartitionCache,
-  partitionKey,
-  setPartitionCache,
-} from "@amase/llm";
-import {
-  filterSkills,
-  qualityConfidence,
-  recordPatchQuality,
-} from "@amase/agents";
 
 // ---------------------------------------------------------------------------
 // Context packing constants
 // ---------------------------------------------------------------------------
-const MAX_FILE_BYTES_SMALL = 6_000;  // files under 6KB: include fully
+const MAX_FILE_BYTES_SMALL = 6_000; // files under 6KB: include fully
 const MAX_FILE_BYTES_LARGE = 12_000; // files 6-12KB: smart slice
-const MAX_FILE_BYTES_CAP = 18_000;   // absolute cap per file
-const DEFAULT_TOTAL_BYTES = 36_000;  // doubled from 24KB
+const MAX_FILE_BYTES_CAP = 18_000; // absolute cap per file
+const DEFAULT_TOTAL_BYTES = 36_000; // doubled from 24KB
 const SYMBOL_CONTEXT_BUDGET = 20_000; // extra budget when contextSlice has symbols
 const DEFAULT_ALLOWED_PATH_CANDIDATES = [
-  "src/", "app/", "lib/", "server/", "api/", "tests/", "test/",
-  "package.json", "tsconfig.json", "pyproject.toml", "go.mod", "Cargo.toml",
+  "src/",
+  "app/",
+  "lib/",
+  "server/",
+  "api/",
+  "tests/",
+  "test/",
+  "package.json",
+  "tsconfig.json",
+  "pyproject.toml",
+  "go.mod",
+  "Cargo.toml",
 ];
 
 // ---------------------------------------------------------------------------
@@ -80,10 +82,13 @@ async function buildContextFiles(
     }
     if (s.isDirectory()) {
       const names = await readdir(abs);
-      await Promise.all(names.map((name) => {
-        if (name === "node_modules" || name === ".amase" || name.startsWith(".git")) return Promise.resolve();
-        return visit(relative(workspace, join(abs, name)).replace(/\\/g, "/"));
-      }));
+      await Promise.all(
+        names.map((name) => {
+          if (name === "node_modules" || name === ".amase" || name.startsWith(".git"))
+            return Promise.resolve();
+          return visit(relative(workspace, join(abs, name)).replace(/\\/g, "/"));
+        }),
+      );
       return;
     }
     if (!s.isFile()) return;
@@ -97,7 +102,12 @@ async function buildContextFiles(
     } else if (size <= MAX_FILE_BYTES_LARGE) {
       // Large file: grab first 60% + last 40% to preserve structure
       const splitAt = Math.floor(size * 0.6);
-      slice = content.slice(0, MAX_FILE_BYTES_LARGE) + "\n/* ... file truncated for context ... */";
+      const firstPart = content.slice(0, splitAt);
+      const lastPart = content.slice(splitAt);
+      // Take up to MAX_FILE_BYTES_LARGE total
+      const available = MAX_FILE_BYTES_LARGE - firstPart.length;
+      const truncatedLastPart = lastPart.slice(0, Math.max(0, available - 100)); // Reserve space for truncation message
+      slice = `${firstPart + truncatedLastPart}\n/* ... file truncated for context ... */`;
     } else {
       // Very large file: hard cap
       slice = content.slice(0, MAX_FILE_BYTES_CAP);
@@ -140,7 +150,9 @@ function normalizeGraph(graph: TaskGraph, fallbackAllowedPaths: string[]): void 
   const existingIds = new Set(graph.nodes.map((n) => n.id));
   for (const node of graph.nodes) {
     node.allowedPaths = normalizeAllowedPaths(node.allowedPaths, fallbackAllowedPaths);
-    node.dependsOn = (node.dependsOn ?? []).filter((dep) => dep !== node.id && existingIds.has(dep));
+    node.dependsOn = (node.dependsOn ?? []).filter(
+      (dep) => dep !== node.id && existingIds.has(dep),
+    );
   }
 }
 
@@ -234,12 +246,15 @@ export class Orchestrator {
   private answers: Map<string, Map<string, UserAnswer>> = new Map();
   private answerResolvers: Map<string, (ans: UserAnswer) => void> = new Map();
   private decisionCache: Map<string, LoggedDecision[]> = new Map();
-  private pendingDecisionContext: Map<string, {
-    workspacePath: string;
-    dagId: string;
-    draft: import("@amase/contracts").DecisionDraft;
-    decisionsPath: string;
-  }> = new Map();
+  private pendingDecisionContext: Map<
+    string,
+    {
+      workspacePath: string;
+      dagId: string;
+      draft: import("@amase/contracts").DecisionDraft;
+      decisionsPath: string;
+    }
+  > = new Map();
   private blockedDecisionsByRun: Map<string, Set<string>> = new Map();
   private blockedChangedByRun: Map<string, EventEmitter> = new Map();
 
@@ -306,7 +321,12 @@ export class Orchestrator {
           runId: ans.runId,
           nodeId: "<architect>",
           event: "user.answer",
-          data: { questionId: ans.questionId, choice: ans.choice, kind: ctx.draft.kind, signature: entry.signature },
+          data: {
+            questionId: ans.questionId,
+            choice: ans.choice,
+            kind: ctx.draft.kind,
+            signature: entry.signature,
+          },
         });
       } catch {
         // best-effort logging
@@ -338,14 +358,29 @@ export class Orchestrator {
               const qid = e.data.questionId as string | undefined;
               const kind = e.data.kind as string | undefined;
               const signature = e.data.signature as string[] | undefined;
-              if (qid && kind && Array.isArray(signature)) questionsById.set(qid, { kind, signature });
+              if (qid && kind && Array.isArray(signature))
+                questionsById.set(qid, { kind, signature });
             } else if (e.event === "user.answer") {
               const qid = e.data.questionId as string | undefined;
               const choice = e.data.choice as 0 | 1 | 2 | undefined;
-              const kind = (e.data.kind as string | undefined) ?? (qid ? questionsById.get(qid)?.kind : undefined);
-              const signature = (e.data.signature as string[] | undefined) ?? (qid ? questionsById.get(qid)?.signature : undefined);
-              if (qid && kind && Array.isArray(signature) && (choice === 0 || choice === 1 || choice === 2)) {
-                out.push({ id: qid, kind: kind as LoggedDecision["kind"], signature, answer: { choice } });
+              const kind =
+                (e.data.kind as string | undefined) ??
+                (qid ? questionsById.get(qid)?.kind : undefined);
+              const signature =
+                (e.data.signature as string[] | undefined) ??
+                (qid ? questionsById.get(qid)?.signature : undefined);
+              if (
+                qid &&
+                kind &&
+                Array.isArray(signature) &&
+                (choice === 0 || choice === 1 || choice === 2)
+              ) {
+                out.push({
+                  id: qid,
+                  kind: kind as LoggedDecision["kind"],
+                  signature,
+                  answer: { choice },
+                });
               }
             }
           }
@@ -522,7 +557,14 @@ export class Orchestrator {
     const execute = async (node: TaskNode): Promise<"completed" | "failed" | "skipped"> => {
       const route = routeNode(node, opts);
       if (route === "skip") {
-        await log.append({ ts: new Date().toISOString(), dagId, runId, nodeId: node.id, event: "node.completed", data: { skipped: true } });
+        await log.append({
+          ts: new Date().toISOString(),
+          dagId,
+          runId,
+          nodeId: node.id,
+          event: "node.completed",
+          data: { skipped: true },
+        });
         return "skipped";
       }
 
@@ -534,7 +576,11 @@ export class Orchestrator {
       if (node.skills && node.skills.length > 0) {
         resolvedSkillIds = node.skills;
       } else if (autoSkillsEnabled) {
-        const rawSkills = resolveSkills({ kind: route, language: node.language, touchedPaths: node.allowedPaths });
+        const rawSkills = resolveSkills({
+          kind: route,
+          language: node.language,
+          touchedPaths: node.allowedPaths,
+        });
         const filtered = filterSkills(rawSkills, route, node.language);
         resolvedSkillIds = filtered.map((s) => s.id);
       }
@@ -548,7 +594,14 @@ export class Orchestrator {
       let lastFailureMessage: string | undefined;
 
       if (resolvedSkillIds.length > 0) {
-        await log.append({ ts: new Date().toISOString(), dagId, runId, nodeId: node.id, event: "skill.applied", data: { skills: resolvedSkillIds, language: node.language } });
+        await log.append({
+          ts: new Date().toISOString(),
+          dagId,
+          runId,
+          nodeId: node.id,
+          event: "skill.applied",
+          data: { skills: resolvedSkillIds, language: node.language },
+        });
       }
 
       while (retries <= maxRetries) {
@@ -561,13 +614,17 @@ export class Orchestrator {
           data: { retries, lastFailureMessage },
         });
 
-        const hasSlice = !!node.contextSlice &&
-          ((node.contextSlice.symbols?.length ?? 0) > 0 || (node.contextSlice.files?.length ?? 0) > 0);
+        const hasSlice =
+          !!node.contextSlice &&
+          ((node.contextSlice.symbols?.length ?? 0) > 0 ||
+            (node.contextSlice.files?.length ?? 0) > 0);
         const contextPaths = node.allowedPaths.length > 0 ? node.allowedPaths : ["."];
 
         // Smart context building: use extra budget when contextSlice has symbols
         const budgetOverride = hasSlice ? DEFAULT_TOTAL_BYTES + SYMBOL_CONTEXT_BUDGET : undefined;
-        const files = hasSlice ? [] : await buildContextFiles(paths.workspace, contextPaths, budgetOverride);
+        const files = hasSlice
+          ? []
+          : await buildContextFiles(paths.workspace, contextPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
@@ -596,7 +653,14 @@ export class Orchestrator {
           ({ output, metrics } = await agent.run(input, paths.workspace));
         } catch (err) {
           const message = (err as Error).message ?? String(err);
-          await log.append({ ts: new Date().toISOString(), dagId, runId, nodeId: node.id, event: "agent.error", data: { retries, message } });
+          await log.append({
+            ts: new Date().toISOString(),
+            dagId,
+            runId,
+            nodeId: node.id,
+            event: "agent.error",
+            data: { retries, message },
+          });
           lastFailureMessage = `agent threw: ${message}`;
           retries += 1;
           continue;
@@ -608,7 +672,11 @@ export class Orchestrator {
           runId,
           nodeId: node.id,
           event: "llm.call",
-          data: { tokensIn: metrics.tokensIn, tokensOut: metrics.tokensOut, durationMs: metrics.durationMs },
+          data: {
+            tokensIn: metrics.tokensIn,
+            tokensOut: metrics.tokensOut,
+            durationMs: metrics.durationMs,
+          },
         });
 
         const ctx: ValidatorContext = {
@@ -619,7 +687,9 @@ export class Orchestrator {
 
         const perNodeValidators: Validator[] = [...this.deps.validators];
         if (resolvedSkillIds.length > 0) {
-          perNodeValidators.push(buildSkillChecksValidator({ skillIds: resolvedSkillIds, language: node.language }));
+          perNodeValidators.push(
+            buildSkillChecksValidator({ skillIds: resolvedSkillIds, language: node.language }),
+          );
         }
 
         // Import here to avoid circular at top level
@@ -653,7 +723,11 @@ export class Orchestrator {
             event: "node.completed",
             data: {
               retries,
-              patches: output.patches.map((p) => ({ path: p.path, op: p.op, bytes: p.content.length })),
+              patches: output.patches.map((p) => ({
+                path: p.path,
+                op: p.op,
+                bytes: p.content.length,
+              })),
             },
           });
           return "completed";
@@ -663,7 +737,14 @@ export class Orchestrator {
         retries += 1;
       }
 
-      await log.append({ ts: new Date().toISOString(), dagId, runId, nodeId: node.id, event: "node.failed", data: { retries, lastFailureMessage } });
+      await log.append({
+        ts: new Date().toISOString(),
+        dagId,
+        runId,
+        nodeId: node.id,
+        event: "node.failed",
+        data: { retries, lastFailureMessage },
+      });
       return "failed";
     };
 
@@ -678,7 +759,8 @@ export class Orchestrator {
       for (const id of this.blockedDecisionsByRun.get(runId) ?? []) merged.add(id);
       return merged;
     };
-    const isBlocked = (node: TaskNode): boolean => isBlockedByQuestion(node, currentBlocked(), nodesById);
+    const isBlocked = (node: TaskNode): boolean =>
+      isBlockedByQuestion(node, currentBlocked(), nodesById);
 
     try {
       await runScheduler(dagId, this.deps.store, execute, { isBlocked, blockedChanged });

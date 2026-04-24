@@ -155,6 +155,6 @@ describe("runScheduler", () => {
     expect(peakOverlap).toBeGreaterThan(2);
     // A validator finishes before the last agent (would be impossible with
     // a single pool of 2 since agents would keep the pool saturated).
-    expect(firstValidatorFinish.t ?? Infinity).toBeLessThan(lastAgentFinish.t ?? 0);
+    expect(firstValidatorFinish.t ?? Number.POSITIVE_INFINITY).toBeLessThan(lastAgentFinish.t ?? 0);
   });
 });

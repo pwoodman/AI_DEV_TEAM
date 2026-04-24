@@ -1,7 +1,7 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type AgentInput, type TaskGraph } from "@amase/contracts";
+import type { AgentInput, TaskGraph } from "@amase/contracts";
 import { DAGStore, DecisionLog } from "@amase/memory";
 import { describe, expect, it } from "vitest";
 import { Orchestrator } from "../src/index.js";
@@ -97,7 +97,10 @@ describe("Orchestrator planning and context scoping", () => {
     await writeFile(join(workspace, "package.json"), '{"name":"x"}\n', "utf8");
 
     const orchestrator = makeOrchestrator(() => makeGraph(workspace, []));
-    const { graph } = await orchestrator.plan({ request: "add endpoint", workspacePath: workspace });
+    const { graph } = await orchestrator.plan({
+      request: "add endpoint",
+      workspacePath: workspace,
+    });
     expect(graph.nodes[0]?.allowedPaths.length).toBeGreaterThan(0);
     expect(graph.nodes[0]?.allowedPaths).toContain("src/");
   });

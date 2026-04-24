@@ -1,4 +1,4 @@
-ake snowimport type { Patch, ValidationResult } from "@amase/contracts";
+import type { Patch, ValidationResult } from "@amase/contracts";
 import type { SkillCheckContext } from "../../../types.js";
 
 const IGNORED_ERR = /,\s*_\s*:?=?\s*[a-zA-Z_][\w.]*\(/;
@@ -46,7 +46,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (NO_TIMEOUT.test(content) && !/ReadTimeout|WriteTimeout/.test(content)) {
       issues.push({
         file: p.path,
-        message: "http.ListenAndServe without timeout configuration. Set ReadTimeout, WriteTimeout, IdleTimeout, and MaxHeaderBytes.",
+        message:
+          "http.ListenAndServe without timeout configuration. Set ReadTimeout, WriteTimeout, IdleTimeout, and MaxHeaderBytes.",
         severity: "warning",
       });
     }
@@ -54,15 +55,20 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (BACKGROUND_CONTEXT.test(content) && /handler|controller|service|worker/.test(content)) {
       issues.push({
         file: p.path,
-        message: "context.Background() in request handler or service. Accept context.Context as first parameter and propagate it.",
+        message:
+          "context.Background() in request handler or service. Accept context.Context as first parameter and propagate it.",
         severity: "warning",
       });
     }
 
-    if (/\b(os\.Open|sql\.Open|net\.Dial|http\.Get)\b/.test(content) && !DEFER_CLOSE.test(content)) {
+    if (
+      /\b(os\.Open|sql\.Open|net\.Dial|http\.Get)\b/.test(content) &&
+      !DEFER_CLOSE.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Resource opened without defer Close(). Ensure cleanup with defer or explicit Close in all paths.",
+        message:
+          "Resource opened without defer Close(). Ensure cleanup with defer or explicit Close in all paths.",
         severity: "warning",
       });
     }

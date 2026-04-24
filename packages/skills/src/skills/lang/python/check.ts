@@ -4,7 +4,8 @@ import type { SkillCheckContext } from "../../../types.js";
 const MUTABLE_DEFAULT = /def\s+\w+\s*\([^)]*=\s*(\[\]|\{\})/;
 const BARE_EXCEPT = /^\s*except\s*:/m;
 const PRINT_DEBUG = /^\s*print\(/m;
-const SQL_FORMATTING = /f['"].*(?:SELECT|INSERT|UPDATE|DELETE)\b.*\{|%.*(?:SELECT|INSERT|UPDATE|DELETE)|\.format\(.*(?:SELECT|INSERT|UPDATE|DELETE)/;
+const SQL_FORMATTING =
+  /f['"].*(?:SELECT|INSERT|UPDATE|DELETE)\b.*\{|%.*(?:SELECT|INSERT|UPDATE|DELETE)|\.format\(.*(?:SELECT|INSERT|UPDATE|DELETE)/;
 const BLOCKING_IN_ASYNC = /async\s+def.*\n.*\b(open|requests\.|urllib|time\.sleep|subprocess)\b/m;
 const NO_TYPE_HINTS = /^\s*def\s+\w+\s*\([^)]*\)\s*(?:->\s*\w+)?\s*:/m;
 
@@ -44,7 +45,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (SQL_FORMATTING.test(content)) {
       issues.push({
         file: p.path,
-        message: "SQL query constructed with string formatting (f-string, %, .format()). Use parameterized queries.",
+        message:
+          "SQL query constructed with string formatting (f-string, %, .format()). Use parameterized queries.",
         severity: "error",
       });
     }
@@ -52,7 +54,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (BLOCKING_IN_ASYNC.test(content)) {
       issues.push({
         file: p.path,
-        message: "Blocking I/O (open, requests, time.sleep, subprocess) inside async function. Use aiohttp, aiofiles, or run_in_executor.",
+        message:
+          "Blocking I/O (open, requests, time.sleep, subprocess) inside async function. Use aiohttp, aiofiles, or run_in_executor.",
         severity: "warning",
       });
     }
@@ -62,7 +65,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (publicFuncs.length > 0) {
       issues.push({
         file: p.path,
-        message: `Public function(s) without return type hints. Add -> type annotations for mypy/pyright compliance.`,
+        message:
+          "Public function(s) without return type hints. Add -> type annotations for mypy/pyright compliance.",
         severity: "warning",
       });
     }

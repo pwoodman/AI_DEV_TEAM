@@ -73,7 +73,10 @@ export async function runScheduler(
     validator: new Map(),
   };
 
-  const allInFlight = (): Array<Promise<void>> => [...inFlight.agent.values(), ...inFlight.validator.values()];
+  const allInFlight = (): Array<Promise<void>> => [
+    ...inFlight.agent.values(),
+    ...inFlight.validator.values(),
+  ];
 
   while (true) {
     const graph = store.get(dagId);

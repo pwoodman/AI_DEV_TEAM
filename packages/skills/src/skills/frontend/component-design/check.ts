@@ -15,14 +15,17 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
   for (const p of patches) {
     if (p.op === "delete") continue;
     const content = p.content;
-    const isComponent = /\b(React\.memo|defineComponent|Vue\.component|SvelteComponent|function\s+\w+Component|const\s+\w+Component)\b/.test(content) ||
-                        /\b(jsx|tsx|vue|svelte)\b/.test(p.path);
+    const isComponent =
+      /\b(React\.memo|defineComponent|Vue\.component|SvelteComponent|function\s+\w+Component|const\s+\w+Component)\b/.test(
+        content,
+      ) || /\b(jsx|tsx|vue|svelte)\b/.test(p.path);
     if (!isComponent) continue;
 
     if (TOO_MANY_PROPS.test(content)) {
       issues.push({
         file: p.path,
-        message: "Props object is very large. Consider splitting into smaller, focused sub-objects (composition pattern).",
+        message:
+          "Props object is very large. Consider splitting into smaller, focused sub-objects (composition pattern).",
         severity: "warning",
       });
     }
@@ -30,7 +33,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (FETCH_IN_COMPONENT.test(content)) {
       issues.push({
         file: p.path,
-        message: "fetch() called inside component. Extract data fetching into a custom hook, loader, or container.",
+        message:
+          "fetch() called inside component. Extract data fetching into a custom hook, loader, or container.",
         severity: "warning",
       });
     }
@@ -38,7 +42,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (WINDOW_GLOBAL.test(content)) {
       issues.push({
         file: p.path,
-        message: "Direct window global access in component. Inject via props or context for testability.",
+        message:
+          "Direct window global access in component. Inject via props or context for testability.",
         severity: "warning",
       });
     }
@@ -47,7 +52,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (megaMatches && new Set(megaMatches).size >= 4) {
       issues.push({
         file: p.path,
-        message: "Flag-driven mega-component detected (4+ boolean/size props). Prefer composition pattern.",
+        message:
+          "Flag-driven mega-component detected (4+ boolean/size props). Prefer composition pattern.",
         severity: "warning",
       });
     }

@@ -29,7 +29,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (TS_EXPECT_ERROR_WITHOUT_REASON.test(content)) {
       issues.push({
         file: p.path,
-        message: "@ts-expect-error without explanation. Add a comment describing why the error is expected.",
+        message:
+          "@ts-expect-error without explanation. Add a comment describing why the error is expected.",
         severity: "warning",
       });
     }
@@ -62,7 +63,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (/\bJSON\.parse\b/.test(content) && !/\b(zod|valibot|io-ts|runtypes|joi)\b/i.test(content)) {
       issues.push({
         file: p.path,
-        message: "JSON.parse without runtime validation. Use Zod, Valibot, or io-ts to validate untrusted input.",
+        message:
+          "JSON.parse without runtime validation. Use Zod, Valibot, or io-ts to validate untrusted input.",
         severity: "error",
       });
     }

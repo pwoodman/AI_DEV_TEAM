@@ -17,10 +17,14 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (!/\.(test|spec)\.(ts|tsx|js|jsx|py|go)$/.test(p.path)) continue;
     const content = p.content;
 
-    if (SETTIMEOUT_IN_TEST.test(content) && !/jest\.useFakeTimers|vi\.useFakeTimers|clock\.install/i.test(content)) {
+    if (
+      SETTIMEOUT_IN_TEST.test(content) &&
+      !/jest\.useFakeTimers|vi\.useFakeTimers|clock\.install/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "setTimeout/setInterval in test without fake timers. Tests with real timers are flaky.",
+        message:
+          "setTimeout/setInterval in test without fake timers. Tests with real timers are flaky.",
         severity: "warning",
       });
     }
@@ -28,7 +32,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (MATH_RANDOM.test(content) && !/mock|seed|fake/i.test(content)) {
       issues.push({
         file: p.path,
-        message: "Math.random() in test without mocking/seeding. Use a deterministic random source.",
+        message:
+          "Math.random() in test without mocking/seeding. Use a deterministic random source.",
         severity: "warning",
       });
     }
@@ -36,7 +41,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (DATE_NOW.test(content) && !/mock|freeze|fake/i.test(content)) {
       issues.push({
         file: p.path,
-        message: "new Date() or Date.now() in test without mocking. Use a frozen clock for determinism.",
+        message:
+          "new Date() or Date.now() in test without mocking. Use a frozen clock for determinism.",
         severity: "warning",
       });
     }
@@ -51,7 +57,9 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     }
 
     // Check for tests with no assertions
-    const testBlocks = content.match(/it\s*\(\s*['"`][^'"`]+['"`]\s*,\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{[^}]*\}/g) ?? [];
+    const testBlocks =
+      content.match(/it\s*\(\s*['"`][^'"`]+['"`]\s*,\s*(?:async\s*)?\([^)]*\)\s*=>\s*\{[^}]*\}/g) ??
+      [];
     for (const block of testBlocks) {
       if (!/expect|assert|should|to\.|\.ok\(|\.equal\(|\.deepEqual\(/.test(block)) {
         issues.push({

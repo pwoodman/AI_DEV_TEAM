@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mean, stdev, welchT, welchPValueTwoSided, welchCI95 } from "../src/stats.js";
+import { mean, stdev, welchCI95, welchPValueTwoSided, welchT } from "../src/stats.js";
 
 describe("stats", () => {
   it("mean of [1,2,3,4,5] is 3", () => {
@@ -24,9 +24,7 @@ describe("stats", () => {
     expect(welchPValueTwoSided([1, 2, 3], [1, 2, 3])).toBeGreaterThan(0.9);
   });
   it("welchPValueTwoSided for widely separated samples < 0.05", () => {
-    expect(
-      welchPValueTwoSided([100, 101, 102, 103], [1, 2, 3, 4]),
-    ).toBeLessThan(0.05);
+    expect(welchPValueTwoSided([100, 101, 102, 103], [1, 2, 3, 4])).toBeLessThan(0.05);
   });
   it("welchCI95 returns [lo, hi] with lo<=mean diff<=hi", () => {
     const a = [10, 11, 12, 13];

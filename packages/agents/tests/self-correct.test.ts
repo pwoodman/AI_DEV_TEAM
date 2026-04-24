@@ -29,7 +29,7 @@ describe("selfCorrect", () => {
       ctx: { workspacePath: "/tmp", allowedPaths: ["src/"], touchesFrontend: false },
     });
     expect(draftCount).toBe(2);
-    expect(result.patches[0]?.path).toBe("src/ok.ts");
+    expect(result.output.patches[0]?.path).toBe("src/ok.ts");
   });
 
   it("returns first draft when validators pass", async () => {
@@ -47,7 +47,7 @@ describe("selfCorrect", () => {
       ctx: { workspacePath: "/tmp", allowedPaths: ["src/"], touchesFrontend: false },
     });
     expect(draftCount).toBe(1);
-    expect(result.patches[0]?.path).toBe("src/ok.ts");
+    expect(result.output.patches[0]?.path).toBe("src/ok.ts");
   });
 
   it("passes feedback string to the second produce call", async () => {

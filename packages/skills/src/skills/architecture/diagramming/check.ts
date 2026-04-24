@@ -20,17 +20,27 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
       if (BINARY_DIAGRAM.test(content) && !/!\[.*\]\(.*\.(png|jpg)\)/.test(content)) {
         issues.push({
           file: p.path,
-          message: "Binary image file referenced as diagram. Use diagrams-as-code (Mermaid, PlantUML, D2) for version-controlled, diffable documentation.",
+          message:
+            "Binary image file referenced as diagram. Use diagrams-as-code (Mermaid, PlantUML, D2) for version-controlled, diffable documentation.",
           severity: "warning",
         });
       }
 
-      if (!MERMAID_BLOCK.test(content) && !PLANTUML_BLOCK.test(content) && !D2_BLOCK.test(content) && !STRUCTURIZR.test(content)) {
+      if (
+        !MERMAID_BLOCK.test(content) &&
+        !PLANTUML_BLOCK.test(content) &&
+        !D2_BLOCK.test(content) &&
+        !STRUCTURIZR.test(content)
+      ) {
         // Only flag if the file claims to contain architecture docs
-        if (/architecture|diagram|system.*design|topology/i.test(content) && !/Check omitted/.test(content)) {
+        if (
+          /architecture|diagram|system.*design|topology/i.test(content) &&
+          !/Check omitted/.test(content)
+        ) {
           issues.push({
             file: p.path,
-            message: "Architecture documentation without a diagrams-as-code block. Add Mermaid, PlantUML, or D2 diagram.",
+            message:
+              "Architecture documentation without a diagrams-as-code block. Add Mermaid, PlantUML, or D2 diagram.",
             severity: "warning",
           });
         }
@@ -41,7 +51,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
       if (!/title|legend|date|version/i.test(content)) {
         issues.push({
           file: p.path,
-          message: "Diagram file missing title, legend, or version metadata. Add context for maintainers.",
+          message:
+            "Diagram file missing title, legend, or version metadata. Add context for maintainers.",
           severity: "warning",
         });
       }

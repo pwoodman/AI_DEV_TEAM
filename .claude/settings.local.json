@@ -1,5 +1,3 @@
 {
-  "disabledMcpjsonServers": [
-    "amase"
-  ]
+  "disabledMcpjsonServers": ["amase"]
 }

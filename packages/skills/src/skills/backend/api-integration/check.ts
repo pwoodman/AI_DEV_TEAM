@@ -24,7 +24,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (SOAP_HAND_CRAFTED.test(content)) {
       issues.push({
         file: p.path,
-        message: "Hand-crafted SOAP XML detected. Use WSDL-generated stubs or a SOAP client library.",
+        message:
+          "Hand-crafted SOAP XML detected. Use WSDL-generated stubs or a SOAP client library.",
         severity: "error",
       });
     }
@@ -32,31 +33,46 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (NO_TIMEOUT.test(content) && !TIMEOUT_CONFIG.test(content)) {
       issues.push({
         file: p.path,
-        message: "HTTP client call without timeout/deadline configuration. Set explicit connection and read timeouts.",
+        message:
+          "HTTP client call without timeout/deadline configuration. Set explicit connection and read timeouts.",
         severity: "warning",
       });
     }
 
-    if (NO_RETRY.test(content) && !RETRY_CONFIG.test(content) && !/health|probe|ping/i.test(content)) {
+    if (
+      NO_RETRY.test(content) &&
+      !RETRY_CONFIG.test(content) &&
+      !/health|probe|ping/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "External API call without retry or circuit breaker. Add resilience patterns for production reliability.",
+        message:
+          "External API call without retry or circuit breaker. Add resilience patterns for production reliability.",
         severity: "warning",
       });
     }
 
-    if (NO_IDEMPOTENCY_KEY.test(content) && !IDEMPOTENCY_HEADER.test(content) && /POST|PUT|PATCH|DELETE/.test(content)) {
+    if (
+      NO_IDEMPOTENCY_KEY.test(content) &&
+      !IDEMPOTENCY_HEADER.test(content) &&
+      /POST|PUT|PATCH|DELETE/.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Mutating HTTP method without idempotency key. Add Idempotency-Key header for safe retries.",
+        message:
+          "Mutating HTTP method without idempotency key. Add Idempotency-Key header for safe retries.",
         severity: "warning",
       });
     }
 
-    if (HARDCODED_AUTH.test(content) && !/process\.env|env\.|config\.|secret|vault/i.test(content)) {
+    if (
+      HARDCODED_AUTH.test(content) &&
+      !/process\.env|env\.|config\.|secret|vault/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Hardcoded API key or token detected. Load credentials from environment or secret manager.",
+        message:
+          "Hardcoded API key or token detected. Load credentials from environment or secret manager.",
         severity: "error",
       });
     }
@@ -64,7 +80,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (/\.catch\s*\(\s*\)\s*;?\s*$|catch\s*\(\s*\w+\s*\)\s*\{\s*\}/m.test(content)) {
       issues.push({
         file: p.path,
-        message: "Empty catch block or swallowed error in API call. Handle or propagate errors with context.",
+        message:
+          "Empty catch block or swallowed error in API call. Handle or propagate errors with context.",
         severity: "warning",
       });
     }

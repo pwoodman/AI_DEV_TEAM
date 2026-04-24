@@ -8,21 +8,17 @@ import { FrontendAgent } from "./frontend.js";
 import { QaAgent } from "./qa.js";
 import { RefactorAgent } from "./refactor.js";
 import { SecurityAgent } from "./security.js";
-import { TestGenAgent } from "./test-gen.js";
-import { UiTestAgent } from "./ui-test.js";
 import {
+  type QualityRecord,
   buildSkillGuideCache,
   recordPatchQuality,
   recordSkillFailure,
   recordSkillSuccess,
-  type QualityRecord,
 } from "./shared/cache.js";
+import { TestGenAgent } from "./test-gen.js";
+import { UiTestAgent } from "./ui-test.js";
 
-export {
-  recordSkillFailure,
-  recordSkillSuccess,
-  recordPatchQuality,
-};
+export { recordSkillFailure, recordSkillSuccess, recordPatchQuality };
 export type { QualityRecord };
 
 export function buildAgentRegistry(

@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -17,10 +17,7 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 function countWords(text: string): number {
-  return text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 describe("skill guide format", () => {
@@ -64,10 +61,9 @@ describe("skill guide format", () => {
       if (!hasCheck) {
         const text = await readFile(file, "utf8");
         // If no check.ts, guide must explicitly state it in a note
-        expect(
-          text,
-          `${file} missing check.ts without explanation`
-        ).toMatch(/no automated check|manual review only|check omitted/i);
+        expect(text, `${file} missing check.ts without explanation`).toMatch(
+          /no automated check|manual review only|check omitted/i,
+        );
       }
     }
   });

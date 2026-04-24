@@ -1,4 +1,4 @@
-ap # TypeScript
+# TypeScript
 
 ## Scope
 

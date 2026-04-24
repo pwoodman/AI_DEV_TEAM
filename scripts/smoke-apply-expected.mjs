@@ -2,7 +2,7 @@
 import { execSync } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, dirname } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,8 +26,8 @@ try {
 }
 const repoRoot = resolve(__dirname, "..");
 const vitestConfig = join(repoRoot, "packages/bench/vitest.fixture.config.ts");
-execSync(
-  `pnpm exec vitest run --root "${work}" --config "${vitestConfig}" --reporter=dot`,
-  { stdio: "inherit", cwd: repoRoot },
-);
+execSync(`pnpm exec vitest run --root "${work}" --config "${vitestConfig}" --reporter=dot`, {
+  stdio: "inherit",
+  cwd: repoRoot,
+});
 console.log("ok:", fxDir);

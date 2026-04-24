@@ -21,7 +21,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (CACHE_NO_TTL.test(content) && !/ttl|expire|maxAge|max-age/i.test(content)) {
       issues.push({
         file: p.path,
-        message: "Cache set without TTL or expiration. All cached data must have a bounded lifetime.",
+        message:
+          "Cache set without TTL or expiration. All cached data must have a bounded lifetime.",
         severity: "warning",
       });
     }
@@ -29,7 +30,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (CACHE_NO_INVALIDATION.test(content) && !INVALIDATION_PATTERN.test(content)) {
       issues.push({
         file: p.path,
-        message: "Cache writes detected but no invalidation logic found. Implement cache invalidation on data mutations.",
+        message:
+          "Cache writes detected but no invalidation logic found. Implement cache invalidation on data mutations.",
         severity: "warning",
       });
     }
@@ -37,7 +39,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (UNBOUNDED_KEY.test(content)) {
       issues.push({
         file: p.path,
-        message: "Cache key constructed with dynamic interpolation. Ensure key cardinality is bounded and evictable.",
+        message:
+          "Cache key constructed with dynamic interpolation. Ensure key cardinality is bounded and evictable.",
         severity: "warning",
       });
     }
@@ -45,7 +48,8 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (NO_COALESCING.test(content) && !COALESCING_PATTERN.test(content)) {
       issues.push({
         file: p.path,
-        message: "Cache read without request coalescing. Add singleflight or deduplication to prevent cache stampede.",
+        message:
+          "Cache read without request coalescing. Add singleflight or deduplication to prevent cache stampede.",
         severity: "warning",
       });
     }

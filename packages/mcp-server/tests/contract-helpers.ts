@@ -68,9 +68,7 @@ export class McpClient {
   }
 }
 
-export async function spawnMcp(
-  opts: { env?: Record<string, string> } = {},
-): Promise<McpClient> {
+export async function spawnMcp(opts: { env?: Record<string, string> } = {}): Promise<McpClient> {
   const child = spawn(process.execPath, [serverPath], {
     env: {
       ...process.env,

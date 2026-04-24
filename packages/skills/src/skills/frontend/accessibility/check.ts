@@ -24,35 +24,50 @@ export async function check(patches: Patch[], _ctx: SkillCheckContext): Promise<
     if (CLICK_ON_DIV.test(content)) {
       issues.push({
         file: p.path,
-        message: "onClick on <div>. Use <button> for interactive elements or add role, tabindex, and keyboard handlers.",
+        message:
+          "onClick on <div>. Use <button> for interactive elements or add role, tabindex, and keyboard handlers.",
         severity: "warning",
       });
     }
     if (CLICK_ON_SPAN.test(content)) {
       issues.push({
         file: p.path,
-        message: "onClick on <span>. Use <button> for interactive elements or add role, tabindex, and keyboard handlers.",
+        message:
+          "onClick on <span>. Use <button> for interactive elements or add role, tabindex, and keyboard handlers.",
         severity: "warning",
       });
     }
-    if (PLACEHOLDER_NO_LABEL.test(content) && !/<label\b|aria-label|aria-labelledby/i.test(content)) {
+    if (
+      PLACEHOLDER_NO_LABEL.test(content) &&
+      !/<label\b|aria-label|aria-labelledby/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Input uses placeholder but has no <label> or aria-label. Labels are required for a11y.",
+        message:
+          "Input uses placeholder but has no <label> or aria-label. Labels are required for a11y.",
         severity: "warning",
       });
     }
-    if (NO_OUTLINE.test(content) && !/focus-visible|focus-within|focus\s*\{[^}]*outline/i.test(content)) {
+    if (
+      NO_OUTLINE.test(content) &&
+      !/focus-visible|focus-within|focus\s*\{[^}]*outline/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "outline: none detected without visible focus replacement. Keyboard users need visible focus indicators.",
+        message:
+          "outline: none detected without visible focus replacement. Keyboard users need visible focus indicators.",
         severity: "warning",
       });
     }
-    if (/setTimeout|setInterval|fetch|axios/i.test(content) && !ARIA_LIVE.test(content) && !/toast|snackbar|notification/i.test(content)) {
+    if (
+      /setTimeout|setInterval|fetch|axios/i.test(content) &&
+      !ARIA_LIVE.test(content) &&
+      !/toast|snackbar|notification/i.test(content)
+    ) {
       issues.push({
         file: p.path,
-        message: "Async operation detected but no aria-live region or notification pattern found. Status updates must be announced to screen readers.",
+        message:
+          "Async operation detected but no aria-live region or notification pattern found. Status updates must be announced to screen readers.",
         severity: "warning",
       });
     }

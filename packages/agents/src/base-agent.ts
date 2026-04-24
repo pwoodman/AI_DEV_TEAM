@@ -72,7 +72,11 @@ function selectModel(kind: AgentKind, complexity: number): string {
 // ---------------------------------------------------------------------------
 const _systemPromptCache = new Map<string, string[]>();
 
-function buildSystemInputs(kind: AgentKind, skillIds: string[], template: string): Array<{ text: string }> {
+function buildSystemInputs(
+  kind: AgentKind,
+  skillIds: string[],
+  template: string,
+): Array<{ text: string }> {
   return [
     { text: template },
     ...(skillIds.length > 0 ? [{ text: "" }] : []), // placeholder replaced below
@@ -118,7 +122,7 @@ async function loadContextSymbols(
       try {
         const text = await astIndex.getSlice(toAbs(sym.path), sym.name);
         if (text === undefined) return null;
-        return { path: `${sym.path}#${sym.name}`, slice: text } as const;
+        return { path: `${sym.path}#${sym.name}`, slice: text };
       } catch {
         return null;
       }
@@ -194,7 +198,12 @@ export abstract class BaseAgent {
   // ---------------------------------------------------------------------------
   protected buildUserMessage(input: AgentInput): string {
     return JSON.stringify(
-      { taskId: input.taskId, goal: input.goal, context: input.context, constraints: input.constraints },
+      {
+        taskId: input.taskId,
+        goal: input.goal,
+        context: input.context,
+        constraints: input.constraints,
+      },
       null,
       2,
     );
@@ -240,7 +249,9 @@ export abstract class BaseAgent {
     if (!systemInputs) {
       const parts: Array<{ text: string }> = [{ text: template }];
       if (skillGuides.length > 0) {
-        parts.push({ text: `\n\n## Applicable skills\n\nApply these practices when producing patches:\n\n${skillGuides.map((g) => `### Skill\n\n${g.trim()}`).join("\n\n")}` });
+        parts.push({
+          text: `\n\n## Applicable skills\n\nApply these practices when producing patches:\n\n${skillGuides.map((g) => `### Skill\n\n${g.trim()}`).join("\n\n")}`,
+        });
       }
       systemInputs = parts.map((p) => p.text);
       _systemPromptCache.set(cacheKey, systemInputs);
@@ -261,9 +272,7 @@ export abstract class BaseAgent {
     let parseErrorFeedback: string | undefined;
 
     const produce = async (feedback?: string): Promise<AgentOutput> => {
-      const effectiveSystem = buildCachedSystem(
-        systemInputs.map((text) => ({ text })),
-      );
+      const effectiveSystem = buildCachedSystem(systemInputs.map((text) => ({ text })));
       const effectiveUser = feedback
         ? `${user}\n\n// NOTE: previous draft failed validation:\n// ${feedback}\n// emit a corrected JSON draft only`
         : user;

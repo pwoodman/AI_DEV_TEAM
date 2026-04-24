@@ -73,7 +73,7 @@ describe("patchSafetyValidator", () => {
 });
 
 describe("runValidatorChain", () => {
-  it("stops at first failure", async () => {
+  it("runs all validators but reports first failure", async () => {
     const bad = { ...okOutput, notes: "a".repeat(300) } as unknown as AgentOutput;
     const outcome = await runValidatorChain(bad, { workspacePath: ".", allowedPaths: ["src/"] }, [
       schemaValidator,
@@ -81,7 +81,7 @@ describe("runValidatorChain", () => {
     ]);
     expect(outcome.ok).toBe(false);
     expect(outcome.firstFailure?.validator).toBe("schema");
-    expect(outcome.results).toHaveLength(1);
+    expect(outcome.results).toHaveLength(2);
   });
 
   it("runs all validators when they pass", async () => {

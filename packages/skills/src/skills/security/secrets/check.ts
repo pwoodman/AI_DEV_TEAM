@@ -13,7 +13,10 @@ const PATTERNS: Array<{ re: RegExp; msg: string; severity?: "warning" | "error" 
   { re: /sk-[A-Za-z0-9]{20,}/, msg: "API key (sk-...) detected." },
   { re: /xox[baprs]-[A-Za-z0-9-]{10,}/, msg: "Slack token detected." },
   { re: /[A-Za-z0-9_-]{24}--[A-Za-z0-9_-]{6}/, msg: "Stripe API key pattern detected." },
-  { re: /eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/, msg: "JWT token pattern detected. Verify it is not a hardcoded secret." },
+  {
+    re: /eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*/,
+    msg: "JWT token pattern detected. Verify it is not a hardcoded secret.",
+  },
   {
     re: /(?:password|passwd|pwd|secret|api[_-]?key|token|auth)\s*[:=]\s*["'][^"'\s]{8,}["']/i,
     msg: "Hardcoded credential literal.",

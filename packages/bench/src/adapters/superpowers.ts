@@ -239,8 +239,8 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     pass,
     tokensIn,
     tokensOut,
-    tokensCached: 0,             // real value wired in Task 8
-    validatorFailures: 0,        // real value wired in Task 7
+    tokensCached: 0, // real value wired in Task 8
+    validatorFailures: 0, // real value wired in Task 7
     wallMs,
     diffSimilarity,
     retries,

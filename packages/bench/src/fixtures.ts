@@ -4,18 +4,25 @@ import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 
-const FIXTURES_DIR = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "fixtures",
-);
+const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 
 export const FixtureCategorySchema = z.enum(["micro", "medium", "large"]);
 export type FixtureCategory = z.infer<typeof FixtureCategorySchema>;
 
 export const FixtureLanguageSchema = z.enum([
-  "ts", "js", "py", "go", "rust", "java", "csharp",
-  "cpp", "c", "ruby", "php", "swift", "kotlin",
+  "ts",
+  "js",
+  "py",
+  "go",
+  "rust",
+  "java",
+  "csharp",
+  "cpp",
+  "c",
+  "ruby",
+  "php",
+  "swift",
+  "kotlin",
 ]);
 export type FixtureLanguage = z.infer<typeof FixtureLanguageSchema>;
 

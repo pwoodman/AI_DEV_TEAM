@@ -201,7 +201,7 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
   if (!opts.live) {
     process.env.AMASE_LLM_STUB = "1";
   } else {
-    delete process.env.AMASE_LLM_STUB;
+    process.env.AMASE_LLM_STUB = undefined;
   }
 
   const workspace = await makeBenchWorkspace(`amase-${fx.id}`);
@@ -284,8 +284,8 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       pass,
       tokensIn,
       tokensOut,
-      tokensCached: 0,             // real value wired in Task 7
-      validatorFailures: 0,        // real value wired in Task 7
+      tokensCached: 0, // real value wired in Task 7
+      validatorFailures: 0, // real value wired in Task 7
       wallMs,
       diffSimilarity,
       retries,
