@@ -65,7 +65,10 @@ export const AgentOutputSchema = z.object({
   notes: z
     .union([z.string(), z.array(z.string())])
     .transform((v) => (Array.isArray(v) ? v.join("; ") : v))
-    .pipe(z.string().max(200)),
+    .transform((v) => (v.length > 2000 ? v.slice(0, 2000) : v))
+    .pipe(z.string().max(2000))
+    .optional()
+    .default(""),
   followups: z.array(TaskNodeSchema).optional(),
   decisions: z.array(DecisionDraftSchema).optional(),
   needsUserInput: z.object({ reason: z.string() }).optional(),

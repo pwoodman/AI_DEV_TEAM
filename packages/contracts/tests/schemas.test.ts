@@ -57,8 +57,9 @@ describe("AgentOutput", () => {
     ).toThrow();
   });
 
-  it("caps notes at 200 chars", () => {
-    expect(() => AgentOutputSchema.parse({ ...valid, notes: "a".repeat(201) })).toThrow();
+  it("truncates notes to 2000 chars at parse time", () => {
+    const parsed = AgentOutputSchema.parse({ ...valid, notes: "a".repeat(2500) });
+    expect(parsed.notes).toHaveLength(2000);
   });
 });
 
