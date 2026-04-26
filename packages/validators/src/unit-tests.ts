@@ -1,12 +1,12 @@
-import { spawn } from "node:child_process";
 import type { AgentOutput } from "@amase/contracts";
 import type { Validator, ValidatorContext } from "./chain.js";
+import { spawnCommand } from "./spawn-command.js";
 
 export const unitTestsValidator: Validator = {
   name: "unit-tests",
   async run(_output: AgentOutput, ctx: ValidatorContext) {
     const start = Date.now();
-    const { code, stdout, stderr } = await runCommand(
+    const { code, stdout, stderr } = await spawnCommand(
       "npx",
       ["vitest", "run", "--reporter=basic"],
       ctx.workspacePath,
@@ -22,18 +22,3 @@ export const unitTestsValidator: Validator = {
     };
   },
 };
-
-function runCommand(cmd: string, args: string[], cwd: string) {
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const p = spawn(cmd, args, { cwd, shell: true });
-    let stdout = "";
-    let stderr = "";
-    p.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    p.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    p.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
-  });
-}

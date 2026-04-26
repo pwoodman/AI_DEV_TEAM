@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
 import type { AgentOutput } from "@amase/contracts";
 import type { Validator, ValidatorContext } from "./chain.js";
+import { spawnCommand } from "./spawn-command.js";
 
 export const lintValidator: Validator = {
   name: "lint",
@@ -10,7 +10,7 @@ export const lintValidator: Validator = {
     if (paths.length === 0) {
       return { validator: "lint", ok: true, issues: [], durationMs: Date.now() - start };
     }
-    const { code, stdout, stderr } = await runCommand(
+    const { code, stdout, stderr } = await spawnCommand(
       "npx",
       ["biome", "check", ...paths],
       ctx.workspacePath,
@@ -26,18 +26,3 @@ export const lintValidator: Validator = {
     };
   },
 };
-
-function runCommand(cmd: string, args: string[], cwd: string) {
-  return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    const p = spawn(cmd, args, { cwd, shell: true });
-    let stdout = "";
-    let stderr = "";
-    p.stdout.on("data", (d) => {
-      stdout += d.toString();
-    });
-    p.stderr.on("data", (d) => {
-      stderr += d.toString();
-    });
-    p.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
-  });
-}
