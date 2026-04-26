@@ -115,16 +115,16 @@ export const ALL_SKILLS: Skill[] = [
   skill(
     "lang/typescript",
     "TypeScript idioms and pitfalls",
-    { languages: ["ts", "js"] },
+    { languages: ["typescript", "javascript"] },
     langTypeScriptCheck,
   ),
-  skill("lang/python", "Python idioms and pitfalls", { languages: ["py"] }, langPythonCheck),
+  skill("lang/python", "Python idioms and pitfalls", { languages: ["python"] }, langPythonCheck),
   skill("lang/go", "Go idioms and pitfalls", { languages: ["go"] }, langGoCheck),
   skill("lang/sql", "Safe SQL authoring and migrations", { languages: ["sql"] }, sqlCheck),
   skill(
     "lang/regex",
     "Regex safety, ReDoS prevention, anchors, capture groups",
-    { languages: ["ts", "js", "py", "go"] },
+    { languages: ["typescript", "javascript", "python", "go"] },
     regexCheck,
   ),
 

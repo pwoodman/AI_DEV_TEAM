@@ -15,7 +15,7 @@ describe("schemaValidator", () => {
   });
 
   it("fails invalid AgentOutput", async () => {
-    const bad = { ...okOutput, notes: "a".repeat(300) } as unknown as AgentOutput;
+    const bad = { ...okOutput, patches: [{ path: "src/a.ts", op: "nuke", content: "x" }] } as unknown as AgentOutput;
     const r = await schemaValidator.run(bad, { workspacePath: ".", allowedPaths: ["src/"] });
     expect(r.ok).toBe(false);
     expect(r.issues.length).toBeGreaterThan(0);
@@ -74,7 +74,7 @@ describe("patchSafetyValidator", () => {
 
 describe("runValidatorChain", () => {
   it("runs all validators but reports first failure", async () => {
-    const bad = { ...okOutput, notes: "a".repeat(300) } as unknown as AgentOutput;
+    const bad = { ...okOutput, patches: [{ path: "src/a.ts", op: "nuke", content: "x" }] } as unknown as AgentOutput;
     const outcome = await runValidatorChain(bad, { workspacePath: ".", allowedPaths: ["src/"] }, [
       schemaValidator,
       patchSafetyValidator,

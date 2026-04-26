@@ -179,7 +179,7 @@ describe("MCP contract: tool-by-tool", () => {
     it("filters by kind", async () => {
       const res = await callTool<{ skills: Array<{ id: string }> }>(client, "amase_skills", {
         kind: "backend",
-        language: "ts",
+        language: "typescript",
       });
       expect(Array.isArray(res.skills)).toBe(true);
     });

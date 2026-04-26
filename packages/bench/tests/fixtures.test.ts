@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { listFixtures, loadFixture } from "../src/fixtures.js";
 
 const EXPECTED_IDS = [
+  "add-audit-log",
   "add-cli-flag",
   "add-cli-subcommand",
   "add-http-endpoint",

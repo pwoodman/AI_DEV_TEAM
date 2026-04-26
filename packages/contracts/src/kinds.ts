@@ -13,5 +13,27 @@ export const AgentKindSchema = z.enum([
 ]);
 export type AgentKind = z.infer<typeof AgentKindSchema>;
 
-export const LanguageSchema = z.enum(["ts", "js", "py", "go", "sql", "other"]);
+export const LanguageSchema = z.enum([
+  "typescript",
+  "javascript",
+  "python",
+  "go",
+  "rust",
+  "java",
+  "csharp",
+  "cpp",
+  "c",
+  "php",
+  "ruby",
+  "swift",
+  "kotlin",
+  "dart",
+  "scala",
+  "shell",
+  "sql",
+  "html-css",
+  "r",
+  "lua",
+  "other",
+]);
 export type Language = z.infer<typeof LanguageSchema>;

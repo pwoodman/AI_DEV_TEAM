@@ -33,7 +33,7 @@ describe("skills registry", () => {
   it("adds language-scoped skill only when language matches", () => {
     const go = resolveSkills({ kind: "backend", language: "go" }).map((s) => s.id);
     expect(go).toContain("lang/go");
-    const ts = resolveSkills({ kind: "backend", language: "ts" }).map((s) => s.id);
+    const ts = resolveSkills({ kind: "backend", language: "typescript" }).map((s) => s.id);
     expect(ts).toContain("lang/typescript");
     expect(ts).not.toContain("lang/go");
   });

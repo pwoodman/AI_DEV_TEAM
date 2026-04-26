@@ -35,6 +35,17 @@ describe("AgentInput", () => {
   it("rejects empty goal", () => {
     expect(() => AgentInputSchema.parse({ ...valid, goal: "" })).toThrow();
   });
+
+  it("accepts full language names", () => {
+    expect(AgentInputSchema.parse({ ...valid, language: "typescript" }).language).toBe("typescript");
+    expect(AgentInputSchema.parse({ ...valid, language: "python" }).language).toBe("python");
+    expect(AgentInputSchema.parse({ ...valid, language: "rust" }).language).toBe("rust");
+  });
+
+  it("rejects old short language codes", () => {
+    expect(() => AgentInputSchema.parse({ ...valid, language: "ts" })).toThrow();
+    expect(() => AgentInputSchema.parse({ ...valid, language: "py" })).toThrow();
+  });
 });
 
 describe("AgentOutput", () => {
