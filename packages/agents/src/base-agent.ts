@@ -25,6 +25,8 @@ export interface AgentMetrics {
   kind: AgentKind;
   tokensIn: number;
   tokensOut: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   durationMs: number;
   model: string;
 }
@@ -145,6 +147,19 @@ function extractJson(text: string): string {
 
 const PROMPTS_DIR = join(dirname(fileURLToPath(import.meta.url)), "prompts");
 
+// Minimal universal system prompt used in lite mode. Mirrors the stock-adapter
+// prompt as closely as possible — every extra token here is paid on every
+// trivial task. taskId is auto-injected at parse time, so we don't ask for it.
+const LITE_SYSTEM_PROMPT = `You are an expert software engineer. Output the required file changes as a single JSON object inside a \`\`\`json fence — no prose outside.
+
+Output:
+\`\`\`json
+{"patches":[{"path":"<rel>","op":"create|modify|delete","content":"<full new content>"}]}
+\`\`\`
+
+- modify/create emit complete new file content (not a diff).
+- Only touch files necessary. Stay inside constraints.allowedPaths.`;
+
 export abstract class BaseAgent {
   abstract readonly kind: AgentKind;
   abstract readonly promptFile: string;
@@ -197,16 +212,26 @@ export abstract class BaseAgent {
   // Build user message
   // ---------------------------------------------------------------------------
   protected buildUserMessage(input: AgentInput): string {
-    return JSON.stringify(
-      {
-        taskId: input.taskId,
-        goal: input.goal,
-        context: input.context,
-        constraints: input.constraints,
-      },
-      null,
-      2,
-    );
+    // Compact framing: ~15-25% fewer tokens than pretty-printed JSON, while
+    // still giving the model labeled sections it can ground on. The agent
+    // prompts reference `goal`, `context.files`, and `constraints.allowedPaths`
+    // — those names appear here as section headers.
+    const files = input.context.files ?? [];
+    const ap = input.constraints.allowedPaths.join(", ");
+    const parts: string[] = [];
+    parts.push(`taskId: ${input.taskId}`);
+    parts.push(`goal: ${input.goal}`);
+    parts.push(`constraints.allowedPaths: ${ap}`);
+    parts.push(`constraints.maxTokens: ${input.constraints.maxTokens}`);
+    if (files.length > 0) {
+      parts.push("context.files:");
+      for (const f of files) {
+        parts.push(`=== ${f.path} ===\n${f.slice}`);
+      }
+    } else {
+      parts.push("context.files: <none>");
+    }
+    return parts.join("\n");
   }
 
   // ---------------------------------------------------------------------------
@@ -224,37 +249,53 @@ export abstract class BaseAgent {
   // ---------------------------------------------------------------------------
   // Main run()
   // ---------------------------------------------------------------------------
-  async run(input: AgentInput, workspace?: string): Promise<AgentRunResult> {
+  async run(
+    input: AgentInput,
+    workspace?: string,
+    opts: { liteMode?: boolean } = {},
+  ): Promise<AgentRunResult> {
     const validated = AgentInputSchema.parse(input);
 
-    // Resolve context slice in parallel
+    // Resolve context slice in parallel; merge with existing files (e.g. test files)
     if (validated.contextSlice) {
       const resolved = await this.buildContextFromSlice(validated.contextSlice, workspace);
       if (resolved.length > 0) {
-        validated.context = { ...validated.context, files: resolved };
+        const existing = validated.context.files ?? [];
+        validated.context = { ...validated.context, files: [...existing, ...resolved] };
       }
     }
 
-    const skillIds = validated.skills ?? [];
+    // Lite mode: stock-style minimal system prompt; skip skills entirely.
+    // Used by orchestrator for ultra-trivial tasks where the kind-specific
+    // prompt + skills are pure overhead. Reliability still comes from
+    // schema/patch-safety validators + sandbox apply gate.
+    const liteMode = opts.liteMode === true;
+    const skillIds = liteMode ? [] : (validated.skills ?? []);
 
     // Build system prompt blocks (eagerly load template and skills in parallel)
-    const [template, skillGuides] = await Promise.all([
-      this.loadPrompt(),
-      loadSkillsGuides(skillIds),
-    ]);
+    let systemInputs: string[];
+    if (liteMode) {
+      systemInputs = [LITE_SYSTEM_PROMPT];
+    } else {
+      const [template, skillGuides] = await Promise.all([
+        this.loadPrompt(),
+        loadSkillsGuides(skillIds),
+      ]);
 
-    const cacheKey = `${this.kind}:${[...skillIds].sort().join(",")}`;
-
-    let systemInputs = _systemPromptCache.get(cacheKey);
-    if (!systemInputs) {
-      const parts: Array<{ text: string }> = [{ text: template }];
-      if (skillGuides.length > 0) {
-        parts.push({
-          text: `\n\n## Applicable skills\n\nApply these practices when producing patches:\n\n${skillGuides.map((g) => `### Skill\n\n${g.trim()}`).join("\n\n")}`,
-        });
+      const cacheKey = `${this.kind}:${[...skillIds].sort().join(",")}`;
+      const cached = _systemPromptCache.get(cacheKey);
+      if (cached) {
+        systemInputs = cached;
+      } else {
+        const parts: Array<{ text: string }> = [{ text: template }];
+        if (skillGuides.length > 0) {
+          parts.push({
+            text: `\n\n## Applicable skills\n\nApply these practices when producing patches:\n\n${skillGuides.map((g) => `### Skill\n\n${g.trim()}`).join("\n\n")}`,
+          });
+        }
+        systemInputs = parts.map((p) => p.text);
+        _systemPromptCache.set(cacheKey, systemInputs);
       }
-      systemInputs = parts.map((p) => p.text);
-      _systemPromptCache.set(cacheKey, systemInputs);
     }
 
     const user = this.buildUserMessage(validated);
@@ -265,6 +306,8 @@ export abstract class BaseAgent {
     const start = Date.now();
     let accTokensIn = 0;
     let accTokensOut = 0;
+    let accCacheRead = 0;
+    let accCacheWrite = 0;
     let lastModel = "";
     const complexity = estimateComplexity(validated);
     const model = selectModel(this.kind, complexity);
@@ -285,6 +328,8 @@ export abstract class BaseAgent {
       });
       accTokensIn += res.tokensIn;
       accTokensOut += res.tokensOut;
+      accCacheRead += res.cacheReadTokens ?? 0;
+      accCacheWrite += res.cacheWriteTokens ?? 0;
       lastModel = res.model;
 
       try {
@@ -326,6 +371,8 @@ export abstract class BaseAgent {
         kind: this.kind,
         tokensIn: accTokensIn,
         tokensOut: accTokensOut,
+        cacheReadTokens: accCacheRead,
+        cacheWriteTokens: accCacheWrite,
         durationMs,
         model: lastModel,
       },
