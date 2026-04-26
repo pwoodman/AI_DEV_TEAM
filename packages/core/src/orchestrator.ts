@@ -3,6 +3,12 @@ import { EventEmitter } from "node:events";
 import type { Stats } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
+
+function debugLog(event: string, data: Record<string, unknown>): void {
+  if (process.env.AMASE_DEBUG_ORCHESTRATOR) {
+    process.stderr.write(`${JSON.stringify({ ts: new Date().toISOString(), event, ...data })}\n`);
+  }
+}
 import type { ArchitectAgent, BaseAgent } from "@amase/agents";
 import { filterSkills, qualityConfidence, recordPatchQuality } from "@amase/agents";
 import type {
@@ -42,8 +48,8 @@ import { isBlockedByQuestion } from "./speculative.js";
 const MAX_FILE_BYTES_SMALL = 6_000; // files under 6KB: include fully
 const MAX_FILE_BYTES_LARGE = 12_000; // files 6-12KB: smart slice
 const MAX_FILE_BYTES_CAP = 18_000; // absolute cap per file
-const DEFAULT_TOTAL_BYTES = 36_000; // doubled from 24KB
-const SYMBOL_CONTEXT_BUDGET = 20_000; // extra budget when contextSlice has symbols
+const DEFAULT_TOTAL_BYTES = 16_000;
+const SYMBOL_CONTEXT_BUDGET = 8_000; // extra budget when contextSlice has symbols
 const DEFAULT_ALLOWED_PATH_CANDIDATES = [
   "src/",
   "app/",
@@ -132,7 +138,13 @@ async function inferDefaultAllowedPaths(workspacePath: string): Promise<string[]
       // ignore missing paths
     }
   }
-  return out.length > 0 ? out : ["."];
+  if (out.length === 0) return ["."];
+  // Source/test directories are far more likely to be relevant than manifest
+  // files. Keep manifests (package.json, tsconfig.json, pyproject.toml, etc.)
+  // available only if no source dir was found — otherwise they bloat the
+  // context with content the model rarely needs.
+  const srcDirs = out.filter((p) => p.endsWith("/"));
+  return srcDirs.length > 0 ? srcDirs : out;
 }
 
 function normalizeAllowedPaths(raw: unknown, fallback: string[]): string[] {
@@ -156,12 +168,38 @@ function normalizeGraph(graph: TaskGraph, fallbackAllowedPaths: string[]): void 
   }
 }
 
+/**
+ * True when a goal does NOT require the kind-specific prompt's rules/examples.
+ * Pagination and rate-limiter need the rich backend prompt; null-guards,
+ * pure renames, simple typed-error additions etc. do not.
+ *
+ * Conservative: when in doubt, return false (use full prompt).
+ */
+function isLiteEligible(goal: string): boolean {
+  const t = goal.toLowerCase();
+  // Patterns that need the full kind-specific prompt to pass:
+  const needsRich =
+    /\b(paginat|page\s*size|rate.lim|token.bucket|window|throttle)\b/.test(t) ||
+    /\b(zod|schema|validator)\b/.test(t) ||
+    /\b(middleware|distributed|microservice|auth|audit|telemetry)\b/.test(t);
+  return !needsRich;
+}
+
 function inferFallbackKind(request: string): AgentKind {
   const text = request.toLowerCase();
+  // Refactor/rename/migrate must be checked BEFORE frontend, because prompts
+  // like "rename component props" contain "component|prop" but should route
+  // to refactor, not frontend.
+  if (/\b(refactor|rename|migrate|cleanup)\b/.test(text)) return "refactor";
   if (/\b(component|frontend|css|react|prop)\b/.test(text)) return "frontend";
   if (/\b(ui test|playwright)\b/.test(text)) return "ui-test";
+  if (/\b(security|vulnerability|injection|xss|csrf|pentest)\b/.test(text)) return "security";
+  if (/\b(docker|dockerfile|ci\b|cd\b|deploy|pipeline|github.action|k8s|kubernetes)\b/.test(text)) return "deployment";
+  // Source-creation tasks that also mention tests → backend writes both; test-gen can't write source
+  if (/\b(schema|class|interface|implement|create|add)\b/.test(text) && /\b(test|vitest|spec)\b/.test(text)) return "backend";
+  // "fix" tasks edit source code, not generate tests — check before test/vitest
+  if (/\bfix\b/.test(text)) return "backend";
   if (/\b(test|vitest)\b/.test(text)) return "test-gen";
-  if (/\b(refactor|rename|migrate|cleanup)\b/.test(text)) return "refactor";
   return "backend";
 }
 
@@ -409,20 +447,43 @@ export class Orchestrator {
   async plan(req: FeatureRequest): Promise<PlanResult> {
     const dagId = randomUUID();
     const paths = runPaths(req.workspacePath, dagId);
+    debugLog("orchestrator.plan.start", { dagId, workspacePath: req.workspacePath, request: req.request });
     await ensureSandbox(paths.workspace);
     await seedSandbox(req.workspacePath, paths.workspace);
     const fallbackAllowedPaths = await inferDefaultAllowedPaths(req.workspacePath);
+    debugLog("orchestrator.fallbackPaths", { dagId, fallbackAllowedPaths });
 
     // ── Decision cache pre-check ─────────────────────────────────────────────
     const reuseLog = await this.loadDecisionCache(req.workspacePath);
+    debugLog("orchestrator.decisionCache", { dagId, cacheSize: reuseLog.length });
     const cachedGraph = await this.tryReuseCachedPlan(req, dagId, reuseLog);
     if (cachedGraph) {
       normalizeGraph(cachedGraph, fallbackAllowedPaths);
       cachedGraph.dagId = dagId;
       await this.deps.store.put(cachedGraph, paths.dagSnapshot);
+      debugLog("orchestrator.plan.cached", { dagId, nodeCount: cachedGraph.nodes.length });
       return { dagId, graph: cachedGraph };
     }
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Fast path: skip architect for trivial, single-node tasks to save tokens.
+    // Bypasses the architect when the task maps cleanly to a single well-known
+    // agent pattern. The backend.md prompt has explicit examples for these cases.
+    const isTrivialTask = (request: string): boolean => {
+      const t = request.toLowerCase();
+      // Pagination on a single route is a well-known single-agent pattern.
+      if ((/\b(paginate|pagination)\b/.test(t) || (/\bpage\b/.test(t) && /\bpagesize\b/.test(t))) && !/\b(middleware|distributed|auth|microservice)\b/.test(t)) return true;
+      if (/\b(rate.lim|token.bucket)\b/.test(t) && !/\b(distributed|auth|microservice)\b/.test(t)) return true;
+      return /\b(rename|migrate|cleanup|extract|inline|fix|guard|null|prop|field|flag|schema|error|vitest|test|validator|endpoint|route|handler)\b/.test(t)
+        && !/\b(middleware|limiter)\b/.test(t);
+    };
+    if (isTrivialTask(req.request) && fallbackAllowedPaths.length <= 4) {
+      const graph = buildFallbackGraph(req, dagId, fallbackAllowedPaths);
+      normalizeGraph(graph, fallbackAllowedPaths);
+      await this.deps.store.put(graph, paths.dagSnapshot);
+      debugLog("orchestrator.plan.fastPath", { dagId, request: req.request, reason: "trivialTask" });
+      return { dagId, graph };
+    }
 
     const architect = this.deps.agents.architect;
     const input: AgentInput = {
@@ -467,6 +528,31 @@ export class Orchestrator {
         ? graph
         : buildFallbackGraph(req, dagId, fallbackAllowedPaths);
     normalizeGraph(effectiveGraph, fallbackAllowedPaths);
+
+    // Enforce explicit "Allowed paths:" constraint from the request text.
+    // When a fixture/prompt declares specific paths, the architect must not
+    // generate nodes (e.g. test-gen) that write outside those paths.
+    const explicitPathMatch = req.request.match(/allowed paths?:\s*([^\n.]+)/i);
+    if (explicitPathMatch?.[1]) {
+      const declaredPaths = explicitPathMatch[1]
+        .split(",")
+        .map((p) => p.trim().replace(/`/g, ""))
+        .filter((p) => p.length > 0);
+      if (declaredPaths.length > 0) {
+        const pathOverlaps = (nodePath: string, declared: string[]): boolean =>
+          declared.some((d) => nodePath.startsWith(d) || d.startsWith(nodePath) || nodePath === d);
+        // Remove nodes whose every allowed path falls outside the declared set
+        effectiveGraph.nodes = effectiveGraph.nodes.filter((node) =>
+          node.allowedPaths.some((p) => pathOverlaps(p, declaredPaths)),
+        );
+        // Clip remaining nodes to only declared paths
+        for (const node of effectiveGraph.nodes) {
+          const clipped = node.allowedPaths.filter((p) => pathOverlaps(p, declaredPaths));
+          if (clipped.length > 0) node.allowedPaths = clipped;
+        }
+      }
+    }
+
     effectiveGraph.dagId = dagId;
     effectiveGraph.workspacePath = req.workspacePath;
     effectiveGraph.createdAt = new Date().toISOString();
@@ -553,10 +639,12 @@ export class Orchestrator {
     const log = this.deps.makeDecisionLog(paths.decisions);
     const maxRetries = this.deps.maxRetriesPerNode ?? 2;
     const patchesByNode: Array<{ nodeId: string; patches: Patch[] }> = [];
+    debugLog("orchestrator.execute.start", { dagId, runId, nodeCount: graph.nodes.length });
 
     const execute = async (node: TaskNode): Promise<"completed" | "failed" | "skipped"> => {
       const route = routeNode(node, opts);
       if (route === "skip") {
+        debugLog("orchestrator.node.skip", { dagId, runId, nodeId: node.id });
         await log.append({
           ts: new Date().toISOString(),
           dagId,
@@ -582,8 +670,18 @@ export class Orchestrator {
           touchedPaths: node.allowedPaths,
         });
         const filtered = filterSkills(rawSkills, route, node.language);
-        resolvedSkillIds = filtered.map((s) => s.id);
+        // Only inject skills whose topic keywords appear in the goal text.
+        // This prevents broad skills (lang/typescript, testing/unit-testing, caching,
+        // async-jobs, etc.) from inflating tokens on tasks where they add no value.
+        const goalWords = node.goal.toLowerCase();
+        const goalRelevant = filtered.filter((s) => {
+          const topic = (s.id.split("/")[1] ?? "");
+          const topicWords = topic.split(/[-_]/);
+          return topicWords.some((w) => w.length > 3 && goalWords.includes(w));
+        });
+        resolvedSkillIds = goalRelevant.map((s) => s.id);
       }
+      debugLog("orchestrator.node.start", { dagId, runId, nodeId: node.id, route, skillCount: resolvedSkillIds.length, maxTokens: Math.floor(4096 * (1 + qualityConfidence(route, node.language) * 0.5)) });
 
       // Quality-based maxTokens adaptation
       const baseMaxTokens = 4096;
@@ -620,11 +718,39 @@ export class Orchestrator {
             (node.contextSlice.files?.length ?? 0) > 0);
         const contextPaths = node.allowedPaths.length > 0 ? node.allowedPaths : ["."];
 
+        // Include tests as read-only context unless the task is trivial
+        // enough that tests are pure overhead (rename/null-guard/simple-fix
+        // patterns). For "add X" / "build X" tasks the test file usually
+        // pins the exact contract, so we MUST keep it.
+        const testsRelevant = !isLiteEligible(node.goal);
+        const testReadPaths: string[] = [];
+        if (!contextPaths.includes(".") && testsRelevant) {
+          for (const d of ["tests/", "test/"]) {
+            if (!contextPaths.includes(d)) {
+              try {
+                await stat(join(paths.workspace, d));
+                testReadPaths.push(d);
+              } catch { /* test dir absent */ }
+            }
+          }
+        }
+        // Strip tests from contextPaths too when not relevant — the fallback
+        // graph adds "tests/" because it exists in the workspace, but the
+        // agent doesn't need them for a pure source edit.
+        const effectiveContextPaths = testsRelevant
+          ? contextPaths
+          : contextPaths.filter((p) => p !== "tests/" && p !== "test/");
+        const allReadPaths = testReadPaths.length > 0
+          ? [...effectiveContextPaths, ...testReadPaths]
+          : effectiveContextPaths;
+
         // Smart context building: use extra budget when contextSlice has symbols
         const budgetOverride = hasSlice ? DEFAULT_TOTAL_BYTES + SYMBOL_CONTEXT_BUDGET : undefined;
         const files = hasSlice
-          ? []
-          : await buildContextFiles(paths.workspace, contextPaths, budgetOverride);
+          ? testReadPaths.length > 0
+            ? await buildContextFiles(paths.workspace, testReadPaths, 4_000)
+            : []
+          : await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
@@ -649,8 +775,12 @@ export class Orchestrator {
         let metrics: Awaited<ReturnType<typeof agent.run>>["metrics"];
 
         try {
-          // agent.run() now handles its own cacheCheckpoint internally via LLM client
-          ({ output, metrics } = await agent.run(input, paths.workspace));
+          // Lite mode: ultra-trivial goals skip the kind-specific prompt and
+          // skills, using a stock-style minimal system prompt. The sandbox +
+          // schema/patch-safety validators still gate correctness. On retry
+          // we fall back to the full prompt so the agent has every advantage.
+          const liteMode = retries === 0 && isLiteEligible(node.goal);
+          ({ output, metrics } = await agent.run(input, paths.workspace, { liteMode }));
         } catch (err) {
           const message = (err as Error).message ?? String(err);
           await log.append({
@@ -675,6 +805,8 @@ export class Orchestrator {
           data: {
             tokensIn: metrics.tokensIn,
             tokensOut: metrics.tokensOut,
+            cacheReadTokens: metrics.cacheReadTokens,
+            cacheWriteTokens: metrics.cacheWriteTokens,
             durationMs: metrics.durationMs,
           },
         });
@@ -715,6 +847,7 @@ export class Orchestrator {
 
           // Apply patches (collision detection deferred to end of DAG)
           patchesByNode.push({ nodeId: node.id, patches: output.patches });
+          debugLog("orchestrator.node.completed", { dagId, runId, nodeId: node.id, route, retries, patchCount: output.patches.length });
           await log.append({
             ts: new Date().toISOString(),
             dagId,
@@ -734,9 +867,11 @@ export class Orchestrator {
         }
 
         lastFailureMessage = `validator ${outcome.firstFailure?.validator} failed: ${outcome.firstFailure?.issues.map((i) => i.message).join("; ")}`;
+        debugLog("orchestrator.node.validatorFailed", { dagId, runId, nodeId: node.id, validator: outcome.firstFailure?.validator, retries });
         retries += 1;
       }
 
+      debugLog("orchestrator.node.failed", { dagId, runId, nodeId: node.id, route, retries, lastFailureMessage });
       await log.append({
         ts: new Date().toISOString(),
         dagId,
@@ -764,6 +899,7 @@ export class Orchestrator {
 
     try {
       await runScheduler(dagId, this.deps.store, execute, { isBlocked, blockedChanged });
+      debugLog("orchestrator.scheduler.done", { dagId, runId });
     } finally {
       this.blockedChangedByRun.delete(dagId);
       this.blockedChangedByRun.delete(runId);

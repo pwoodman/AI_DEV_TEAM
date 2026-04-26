@@ -147,10 +147,23 @@ async function runFixtureTests(workspace: string): Promise<{ pass: boolean; erro
 }
 
 /**
+ * Infer the agent kind from a prompt text, mirroring Orchestrator.inferFallbackKind.
+ */
+function inferKindFromPrompt(text: string): string {
+  const t = text.toLowerCase();
+  if (/\b(component|frontend|css|react|prop)\b/.test(t)) return "frontend";
+  if (/\b(ui test|playwright)\b/.test(t)) return "ui-test";
+  if (/\b(test|vitest)\b/.test(t)) return "test-gen";
+  if (/\b(refactor|migrate|rename)\b/.test(t)) return "refactor";
+  return "backend";
+}
+
+/**
  * Build a stub LLM responder that mimics the smoke-orchestrator.mjs approach.
- * The architect emits a task-graph with a single refactor node, and the refactor
- * agent emits a placeholder patch. The stub LLM path does not produce a correct
- * fix — pass=false is expected at Task 3 scope.
+ * The architect emits a task-graph with a single node whose kind is inferred
+ * from the prompt, and the downstream agent emits a placeholder patch.
+ * The stub LLM path does not produce a correct fix — pass=false is expected
+ * at Task 3 scope.
  */
 function buildStubResponder(workspacePath: string, prompt: string, contextFiles: string[]) {
   return (req: { system: string | { text: string }[]; user: string }) => {
@@ -158,6 +171,7 @@ function buildStubResponder(workspacePath: string, prompt: string, contextFiles:
       typeof req.system === "string" ? req.system : req.system.map((b) => b.text).join("\n");
     const isArchitect = systemText.includes("Architect Agent");
     if (isArchitect) {
+      const kind = inferKindFromPrompt(prompt);
       const graph = {
         dagId: "will-be-overwritten",
         request: prompt,
@@ -166,7 +180,7 @@ function buildStubResponder(workspacePath: string, prompt: string, contextFiles:
         nodes: [
           {
             id: "n1",
-            kind: "refactor",
+            kind,
             goal: prompt,
             dependsOn: [],
             allowedPaths: ["src/"],
@@ -195,6 +209,12 @@ function buildStubResponder(workspacePath: string, prompt: string, contextFiles:
   };
 }
 
+function debugLog(event: string, data: Record<string, unknown>): void {
+  if (process.env.AMASE_DEBUG_BENCH) {
+    process.stderr.write(`${JSON.stringify({ ts: new Date().toISOString(), event, ...data })}\n`);
+  }
+}
+
 export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult> {
   // Live runs must not set AMASE_LLM_STUB — that's what forces the stub path
   // inside mcp-server and friends. For stub/unit benches we keep it on.
@@ -204,14 +224,19 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
     process.env.AMASE_LLM_STUB = undefined;
   }
 
+  debugLog("amase.run.start", { taskId: fx.id, runId: opts.runId, live: opts.live, model: opts.model });
+
   const workspace = await makeBenchWorkspace(`amase-${fx.id}`);
   let dagId: string | undefined;
 
   try {
     await materializeTree(workspace, fx.beforeTree);
     await copyDir(fx.testsDir, join(workspace, "tests"));
+    debugLog("amase.workspace.ready", { taskId: fx.id, workspace, fileCount: fx.beforeTree.size });
 
     const contextFiles = pickContextFiles(fx.beforeTree);
+    debugLog("amase.context.picked", { taskId: fx.id, contextFiles });
+
     const llm: LlmClient = opts.live
       ? new AnthropicClient({ model: opts.model })
       : new StubLlmClient(buildStubResponder(workspace, fx.prompt, contextFiles));
@@ -228,14 +253,20 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
     let pass = false;
     let tokensIn = 0;
     let tokensOut = 0;
+    let cacheReadTokens = 0;
+    let cacheWriteTokens = 0;
     let retries = 0;
     let error: string | undefined;
 
     try {
+      debugLog("amase.plan.start", { taskId: fx.id });
       const planResult = await orchestrator.plan({ request: fx.prompt, workspacePath: workspace });
       dagId = planResult.dagId;
+      debugLog("amase.plan.done", { taskId: fx.id, dagId, nodeCount: planResult.graph.nodes.length });
 
+      debugLog("amase.execute.start", { taskId: fx.id, dagId });
       await orchestrator.execute(dagId);
+      debugLog("amase.execute.done", { taskId: fx.id, dagId });
 
       // Choice B: aggregate token metrics from the decision log.
       const paths = runPaths(workspace, dagId);
@@ -244,21 +275,32 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
 
       for (const entry of entries) {
         if (entry.event === "llm.call") {
-          const data = entry.data as { tokensIn?: number; tokensOut?: number };
+          const data = entry.data as {
+            tokensIn?: number;
+            tokensOut?: number;
+            cacheReadTokens?: number;
+            cacheWriteTokens?: number;
+          };
           tokensIn += data.tokensIn ?? 0;
           tokensOut += data.tokensOut ?? 0;
+          cacheReadTokens += data.cacheReadTokens ?? 0;
+          cacheWriteTokens += data.cacheWriteTokens ?? 0;
         }
         if (entry.event === "node.retried") {
           retries += 1;
         }
       }
+      debugLog("amase.metrics.aggregated", { taskId: fx.id, tokensIn, tokensOut, cacheReadTokens, cacheWriteTokens, retries, logEntries: entries.length });
 
       // Execute fixture tests against the produced workspace to score pass/fail.
+      debugLog("amase.tests.start", { taskId: fx.id, workspace: paths.workspace });
       const testResult = await runFixtureTests(paths.workspace);
+      debugLog("amase.tests.done", { taskId: fx.id, pass: testResult.pass, error: testResult.error });
       pass = testResult.pass;
       if (!pass && !error) error = testResult.error;
     } catch (e) {
       error = (e as Error).message;
+      debugLog("amase.run.error", { taskId: fx.id, error });
     }
 
     const wallMs = Date.now() - start;
@@ -272,9 +314,10 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       const afterTree = await readTreeFromDisk(sandbox);
       const observedPatch = synthesizePatch(fx.beforeTree, afterTree);
       diffSimilarity = computeDiffSimilarity(observedPatch, fx.expectedPatch);
+      debugLog("amase.diff.computed", { taskId: fx.id, diffSimilarity });
     }
 
-    return {
+    const result: BenchResult = {
       runId: opts.runId,
       timestamp: new Date().toISOString(),
       taskId: fx.id,
@@ -284,14 +327,17 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       pass,
       tokensIn,
       tokensOut,
-      tokensCached: 0, // real value wired in Task 7
+      tokensCached: cacheReadTokens,
       validatorFailures: 0, // real value wired in Task 7
       wallMs,
       diffSimilarity,
       retries,
       error,
     };
+    debugLog("amase.run.finish", { taskId: fx.id, pass, wallMs, diffSimilarity, retries });
+    return result;
   } finally {
     await rm(workspace, { recursive: true, force: true }).catch(() => {});
+    debugLog("amase.workspace.cleaned", { taskId: fx.id, workspace });
   }
 }

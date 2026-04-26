@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const StackSchema = z.enum(["amase", "superpowers"]);
+export const StackSchema = z.enum(["amase", "superpowers", "stock"]);
 export type Stack = z.infer<typeof StackSchema>;
 
 export const FairnessSchema = z.enum(["primary", "secondary"]);
