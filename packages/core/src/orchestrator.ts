@@ -637,11 +637,27 @@ export class Orchestrator {
     if (!graph) throw new Error(`unknown dagId: ${dagId}`);
     const paths = runPaths(graph.workspacePath, dagId);
     const log = this.deps.makeDecisionLog(paths.decisions);
+    await log.append({
+      ts: new Date().toISOString(),
+      dagId,
+      runId,
+      nodeId: "<run>",
+      event: "run.started",
+      data: { totalNodes: graph.nodes.length },
+    });
     const maxRetries = this.deps.maxRetriesPerNode ?? 2;
     const patchesByNode: Array<{ nodeId: string; patches: Patch[] }> = [];
     debugLog("orchestrator.execute.start", { dagId, runId, nodeCount: graph.nodes.length });
 
     const execute = async (node: TaskNode): Promise<"completed" | "failed" | "skipped"> => {
+      await log.append({
+        ts: new Date().toISOString(),
+        dagId,
+        runId,
+        nodeId: node.id,
+        event: "node.enqueued",
+        data: { agentKind: node.kind, depsReady: node.dependsOn.length },
+      });
       const route = routeNode(node, opts);
       if (route === "skip") {
         debugLog("orchestrator.node.skip", { dagId, runId, nodeId: node.id });
@@ -810,6 +826,20 @@ export class Orchestrator {
             durationMs: metrics.durationMs,
           },
         });
+        await log.append({
+          ts: new Date().toISOString(),
+          dagId,
+          runId,
+          nodeId: node.id,
+          event: "agent.llm.response",
+          data: {
+            tokensIn: metrics.tokensIn,
+            tokensOut: metrics.tokensOut,
+            tokensCached: metrics.cacheReadTokens ?? 0,
+            latencyMs: metrics.durationMs,
+            model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6",
+          },
+        });
 
         const ctx: ValidatorContext = {
           workspacePath: paths.workspace,
@@ -956,6 +986,20 @@ export class Orchestrator {
         data: { ok: result.ok, issues: result.issues, durationMs: result.durationMs },
       });
     }
+
+    await log.append({
+      ts: new Date().toISOString(),
+      dagId,
+      runId,
+      nodeId: "<run>",
+      event: "run.completed",
+      data: {
+        outcome: graph.nodes.every(
+          (n) => n.status === "completed" || n.status === "skipped"
+        ) ? "ok" : "partial",
+        wallMs: 0,
+      },
+    });
 
     return { runId };
   }
