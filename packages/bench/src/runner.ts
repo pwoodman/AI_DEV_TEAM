@@ -20,8 +20,15 @@ export interface RunConfig {
 
 const CACHE_DIR = join(process.cwd(), "bench", "cache");
 
-function cacheKey(taskId: string, stack: Stack, model: string, fairness: string, prompt: string): string {
-  const hash = createHash("sha256").update(`${taskId}:${stack}:${model}:${fairness}:${prompt}`).digest("hex").slice(0, 16);
+function treeHash(tree: Map<string, string>): string {
+  return createHash("sha256")
+    .update(JSON.stringify([...tree.entries()].sort()))
+    .digest("hex")
+    .slice(0, 8);
+}
+
+function cacheKey(taskId: string, stack: Stack, model: string, fairness: string, prompt: string, tree: Map<string, string>): string {
+  const hash = createHash("sha256").update(`${taskId}:${stack}:${model}:${fairness}:${prompt}:${treeHash(tree)}`).digest("hex").slice(0, 16);
   return hash;
 }
 
@@ -69,7 +76,7 @@ export async function runBench(cfg: RunConfig): Promise<BenchResult[]> {
       const perStack = await Promise.all(
         cfg.stacks.map(async (stack) => {
           if (stack === "superpowers" || stack === "stock") {
-            const key = cacheKey(fx.id, stack, model, fairness, fx.prompt) + `-s${seq}`;
+            const key = cacheKey(fx.id, stack, model, fairness, fx.prompt, fx.beforeTree) + `-s${seq}`;
             const cached = await readCachedResult(key, cacheDir);
             if (cached) {
               const result: BenchResult = { ...cached, runId, runSeq: seq, timestamp: new Date().toISOString() };

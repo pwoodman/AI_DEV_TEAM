@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     exclude: ["**/node_modules/**", "**/dist/**"],
+    globals: true,
     pool: "threads",
     testTimeout: 20_000,
   },

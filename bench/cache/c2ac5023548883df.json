@@ -1,1 +1,0 @@
-{"runId":"2026-04-25T00-14-05-882Z","timestamp":"2026-04-25T00:18:49.323Z","taskId":"add-typed-error","stack":"superpowers","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":11,"tokensOut":533,"tokensCached":0,"validatorFailures":0,"wallMs":18293,"diffSimilarity":0.2719298245614035,"retries":0}

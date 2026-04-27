@@ -1,1 +1,0 @@
-{"runId":"2026-04-25T00-14-05-882Z","timestamp":"2026-04-25T00:24:17.421Z","taskId":"migrate-component-prop-shape","stack":"superpowers","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":18,"tokensOut":1036,"tokensCached":0,"validatorFailures":0,"wallMs":19592,"diffSimilarity":0.2839506172839506,"retries":0}

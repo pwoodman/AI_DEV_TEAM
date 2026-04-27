@@ -1,1 +1,0 @@
-{"runId":"2026-04-26T01-20-24-155Z","timestamp":"2026-04-26T01:25:17.959Z","taskId":"migrate-component-prop-shape","stack":"stock","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":337,"tokensOut":120,"tokensCached":0,"validatorFailures":0,"wallMs":4555,"diffSimilarity":0.2804878048780488,"retries":0}
