@@ -18,8 +18,8 @@ export function renderTrace(entries: DecisionLogEntry[]): string {
 
   const runStart = entries.find((e) => e.event === "run.started");
   const runEnd = entries.find((e) => e.event === "run.completed");
-  const t0 = runStart ? new Date(runStart.ts).getTime() : new Date(entries[0].ts).getTime();
-  const tEnd = runEnd ? new Date(runEnd.ts).getTime() : new Date(entries[entries.length - 1].ts).getTime();
+  const t0 = runStart ? new Date(runStart.ts).getTime() : new Date(entries[0]!.ts).getTime();
+  const tEnd = runEnd ? new Date(runEnd.ts).getTime() : new Date(entries[entries.length - 1]!.ts).getTime();
   const runWallMs = tEnd - t0;
 
   // ── WATERFALL ────────────────────────────────────────────────────────────────

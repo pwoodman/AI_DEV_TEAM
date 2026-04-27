@@ -1,6 +1,9 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { DecisionLogEntrySchema } from "@amase/contracts";
 import { printTable, reportHeadline } from "./reporter.js";
+import { renderTrace } from "./trace.js";
 import { runBench } from "./runner.js";
 import { listFixtures, loadFixture } from "./fixtures.js";
 import type { Fairness, Stack } from "./types.js";
@@ -10,18 +13,35 @@ function getArg(args: string[], name: string): string | undefined {
   return args.find((a) => a.startsWith(prefix))?.slice(prefix.length);
 }
 
-async function main() {
-  const args = process.argv.slice(2);
-  const cmd = args[0];
-  if (cmd !== "run") {
-    console.error(
-      "usage: amase-bench run [--stacks=amase,superpowers] [--samples=3] " +
-        "[--model=claude-sonnet-4-6] [--fairness=primary|secondary|both] " +
-        "[--tasks=id1,id2] [--live]",
-    );
+async function cmdTrace(args: string[]): Promise<void> {
+  const decisionsPath = args[1];
+  if (!decisionsPath) {
+    console.error("usage: amase-bench trace <path/to/decisions.jsonl>");
     process.exit(2);
   }
+  let raw: string;
+  try {
+    raw = await readFile(decisionsPath, "utf8");
+  } catch {
+    console.error(`cannot read: ${decisionsPath}`);
+    process.exit(1);
+    return;
+  }
+  const entries = raw
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return DecisionLogEntrySchema.parse(JSON.parse(line));
+      } catch {
+        return null;
+      }
+    })
+    .filter((e): e is NonNullable<typeof e> => e !== null);
+  process.stdout.write(renderTrace(entries));
+}
 
+async function cmdRun(args: string[]): Promise<void> {
   const stacks = (getArg(args, "stacks") ?? "amase,superpowers").split(",") as Stack[];
   const samples = Number(getArg(args, "samples") ?? "3");
   if (!Number.isFinite(samples) || samples < 1) {
@@ -43,7 +63,6 @@ async function main() {
       stacks, tasks, live, samples, model, fairness, outDir,
     });
 
-    // Load descriptions for the table
     const ids = tasks ?? (await listFixtures());
     const descriptions = new Map<string, string>();
     for (const id of ids) {
@@ -61,6 +80,30 @@ async function main() {
       process.exitCode = 1;
     }
   }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const cmd = args[0];
+
+  if (cmd === "trace") {
+    await cmdTrace(args);
+    return;
+  }
+
+  if (cmd === "run") {
+    await cmdRun(args);
+    return;
+  }
+
+  console.error(
+    "usage:\n" +
+      "  amase-bench run [--stacks=amase,superpowers] [--samples=3] " +
+      "[--model=claude-sonnet-4-6] [--fairness=primary|secondary|both] " +
+      "[--tasks=id1,id2] [--live]\n" +
+      "  amase-bench trace <path/to/decisions.jsonl>",
+  );
+  process.exit(2);
 }
 
 main().catch((e) => {
