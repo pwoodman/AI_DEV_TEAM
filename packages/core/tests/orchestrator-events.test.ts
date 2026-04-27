@@ -51,4 +51,6 @@ test("execute emits run.started and run.completed", async () => {
 
   expect(eventTypes).toContain("run.started");
   expect(eventTypes).toContain("run.completed");
+  expect(eventTypes).toContain("node.enqueued");
+  expect(eventTypes).toContain("agent.llm.response");
 }, 30_000);
