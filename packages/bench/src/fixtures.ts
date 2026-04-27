@@ -6,7 +6,7 @@ import { z } from "zod";
 
 const FIXTURES_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures");
 
-export const FixtureCategorySchema = z.enum(["micro", "medium", "large"]);
+export const FixtureCategorySchema = z.enum(["micro", "medium", "large", "xl"]);
 export type FixtureCategory = z.infer<typeof FixtureCategorySchema>;
 
 export const FixtureLanguageSchema = z.enum([

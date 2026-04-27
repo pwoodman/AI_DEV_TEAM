@@ -53,4 +53,11 @@ test("execute emits run.started and run.completed", async () => {
   expect(eventTypes).toContain("run.completed");
   expect(eventTypes).toContain("node.enqueued");
   expect(eventTypes).toContain("agent.llm.response");
+
+  // node.enqueued must precede node.started (it fires at top of the execute closure)
+  const enqueuedIdx = eventTypes.indexOf("node.enqueued");
+  const startedIdx = eventTypes.indexOf("node.started");
+  if (enqueuedIdx >= 0 && startedIdx >= 0) {
+    expect(enqueuedIdx).toBeLessThan(startedIdx);
+  }
 }, 30_000);
