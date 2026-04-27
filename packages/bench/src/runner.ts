@@ -5,7 +5,7 @@ import { runAmase } from "./adapters/amase.js";
 import { runStock } from "./adapters/stock.js";
 import { runSuperpowers } from "./adapters/superpowers.js";
 import { listFixtures, loadFixture } from "./fixtures.js";
-import type { BenchResult, Stack } from "./types.js";
+import type { BenchResult, Fairness, Stack } from "./types.js";
 
 export interface RunConfig {
   stacks: Stack[];
@@ -13,6 +13,9 @@ export interface RunConfig {
   live?: boolean;
   outDir?: string;
   cacheDir?: string;
+  samples?: number;    // default 3
+  model?: string;      // default "claude-sonnet-4-6"
+  fairness?: Fairness; // default "primary"
 }
 
 const CACHE_DIR = join(process.cwd(), ".amase", "bench-cache");
@@ -42,42 +45,51 @@ async function writeCachedResult(key: string, cacheDir: string, result: BenchRes
 
 export async function runBench(cfg: RunConfig): Promise<BenchResult[]> {
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
-  const outDir = cfg.outDir ?? join(process.cwd(), "bench/results");
   const cacheDir = cfg.cacheDir ?? CACHE_DIR;
-  await mkdir(outDir, { recursive: true });
+  const samples = cfg.samples ?? 3;
+  const model = cfg.model ?? "claude-sonnet-4-6";
+  const fairness = cfg.fairness ?? ("primary" as const);
+
   await mkdir(cacheDir, { recursive: true });
-  const outFile = join(outDir, `${runId}.jsonl`);
+
+  let outFile: string | undefined;
+  if (cfg.outDir !== undefined) {
+    const outDir = cfg.outDir;
+    await mkdir(outDir, { recursive: true });
+    outFile = join(outDir, `${runId}.jsonl`);
+  }
 
   const allIds = cfg.tasks ?? (await listFixtures());
   const results: BenchResult[] = [];
+
   for (const id of allIds) {
     const fx = await loadFixture(id);
-    const perStack = await Promise.all(
-      cfg.stacks.map(async (stack) => {
-        const model = "claude-sonnet-4-6";
-        const fairness = "primary" as const;
-        const opts = { runId, runSeq: 1, model, fairness, live: cfg.live };
-
-        if (stack === "superpowers" || stack === "stock") {
-          const key = cacheKey(fx.id, stack, model, fairness, fx.prompt);
-          const cached = await readCachedResult(key, cacheDir);
-          if (cached) {
-            const result: BenchResult = { ...cached, runId, timestamp: new Date().toISOString() };
+    for (let seq = 1; seq <= samples; seq++) {
+      const opts = { runId, runSeq: seq, model, fairness, live: cfg.live };
+      const perStack = await Promise.all(
+        cfg.stacks.map(async (stack) => {
+          if (stack === "superpowers" || stack === "stock") {
+            const key = cacheKey(fx.id, stack, model, fairness, fx.prompt) + `-s${seq}`;
+            const cached = await readCachedResult(key, cacheDir);
+            if (cached) {
+              const result: BenchResult = { ...cached, runId, runSeq: seq, timestamp: new Date().toISOString() };
+              return result;
+            }
+            const result = stack === "superpowers"
+              ? await runSuperpowers(fx, opts)
+              : await runStock(fx, opts);
+            await writeCachedResult(key, cacheDir, result);
             return result;
           }
-          const result = stack === "superpowers"
-            ? await runSuperpowers(fx, opts)
-            : await runStock(fx, opts);
-          await writeCachedResult(key, cacheDir, result);
-          return result;
+          return runAmase(fx, opts);
+        }),
+      );
+      for (const result of perStack) {
+        results.push(result);
+        if (outFile !== undefined) {
+          await appendFile(outFile, `${JSON.stringify(result)}\n`);
         }
-
-        return runAmase(fx, opts);
-      }),
-    );
-    for (const result of perStack) {
-      results.push(result);
-      await appendFile(outFile, `${JSON.stringify(result)}\n`);
+      }
     }
   }
   return results;
