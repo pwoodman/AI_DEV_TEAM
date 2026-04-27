@@ -127,21 +127,24 @@ async function runFixtureTests(workspace: string): Promise<{ pass: boolean; erro
  * Walk any JSON object and sum every `{ input_tokens, output_tokens }` pair
  * we find at any nesting level. Claude CLI stream-json nests usage under
  * `message.usage` for assistant events — this is defensive for other shapes.
+ * Also captures `cache_read_input_tokens` when present.
  */
-function extractUsage(obj: unknown): { in: number; out: number } {
+function extractUsage(obj: unknown): { in: number; out: number; cached: number } {
   let i = 0;
   let o = 0;
+  let c = 0;
   const visit = (v: unknown) => {
     if (!v || typeof v !== "object") return;
     const r = v as Record<string, unknown>;
     if (typeof r.input_tokens === "number" && typeof r.output_tokens === "number") {
       i += r.input_tokens;
       o += r.output_tokens;
+      if (typeof r.cache_read_input_tokens === "number") c += r.cache_read_input_tokens;
     }
     for (const k of Object.keys(r)) visit(r[k]);
   };
   visit(obj);
-  return { in: i, out: o };
+  return { in: i, out: o, cached: c };
 }
 
 export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchResult> {
@@ -150,6 +153,7 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
   let pass = false;
   let tokensIn = 0;
   let tokensOut = 0;
+  let tokensCached = 0;
   const retries = 0;
   let error: string | undefined;
 
@@ -201,6 +205,7 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
         const u = extractUsage(ev);
         tokensIn += u.in;
         tokensOut += u.out;
+        tokensCached += u.cached;
       } catch {
         // non-JSON line — ignore
       }
@@ -246,7 +251,7 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     pass,
     tokensIn,
     tokensOut,
-    tokensCached: 0, // real value wired in Task 8
+    tokensCached,
     validatorFailures: 0, // real value wired in Task 7
     wallMs,
     diffSimilarity,
