@@ -1,0 +1,66 @@
+name: bench
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: "Samples per cell"
+        required: false
+        default: "3"
+      fairness:
+        description: "primary | secondary | both"
+        required: false
+        default: "primary"
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm -r test
+
+  bench:
+    runs-on: ubuntu-latest
+    needs: unit
+    timeout-minutes: 45
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+      - name: Install Claude CLI (for superpowers adapter)
+        run: npm install -g @anthropic-ai/claude-code
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Bench (primary fairness)
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        run: |
+          node packages/bench/dist/cli.js run \
+            --samples=${{ github.event.inputs.samples || '3' }} \
+            --model=claude-sonnet-4-6 \
+            --fairness=${{ github.event.inputs.fairness || 'primary' }} \
+            --live
+      - name: Upload JSONL results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-${{ github.run_id }}
+          path: bench/results/*.jsonl
