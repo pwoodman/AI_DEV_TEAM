@@ -156,6 +156,7 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
   let tokensCached = 0;
   const retries = 0;
   let error: string | undefined;
+  let observedModel: string | undefined;
 
   try {
     await materializeTree(workspace, fx.beforeTree);
@@ -167,7 +168,8 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     // is required for non-interactive fixture runs (no acceptAll option exists).
     let stdoutBuf = "";
     let stderrBuf = "";
-    const command = `claude --model ${opts.model} --print --output-format=stream-json --verbose --permission-mode=bypassPermissions`;
+    const modelFlag = opts.fairness === "primary" ? `--model ${opts.model}` : "";
+    const command = `claude --print ${modelFlag} --output-format=stream-json --verbose --permission-mode=bypassPermissions`.replace(/\s+/g, " ").trim();
     for (let attempt = 0; attempt < CLAUDE_MAX_ATTEMPTS; attempt++) {
       stdoutBuf = "";
       stderrBuf = "";
@@ -206,6 +208,11 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
         tokensIn += u.in;
         tokensOut += u.out;
         tokensCached += u.cached;
+        if (!observedModel) {
+          const ev2 = ev as Record<string, unknown>;
+          const msg = ev2.message as { model?: string } | undefined;
+          if (msg?.model) observedModel = msg.model;
+        }
       } catch {
         // non-JSON line — ignore
       }
@@ -246,7 +253,7 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
     timestamp: new Date().toISOString(),
     taskId: fx.id,
     stack: "superpowers",
-    model: opts.model,
+    model: opts.fairness === "primary" ? opts.model : (observedModel ?? "unknown"),
     runSeq: opts.runSeq,
     pass,
     tokensIn,

@@ -239,7 +239,9 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
     debugLog("amase.context.picked", { taskId: fx.id, contextFiles });
 
     const llm: LlmClient = opts.live
-      ? new AnthropicClient({ model: opts.model })
+      ? opts.fairness === "primary"
+        ? new AnthropicClient({ model: opts.model })
+        : new AnthropicClient()  // router/env-driven in secondary
       : new StubLlmClient(buildStubResponder(workspace, fx.prompt, contextFiles));
     const agents = buildAgentRegistry(llm);
     const store = new DAGStore();
@@ -333,7 +335,7 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       timestamp: new Date().toISOString(),
       taskId: fx.id,
       stack: "amase",
-      model: opts.model,
+      model: opts.fairness === "primary" ? opts.model : (process.env.AMASE_MODEL ?? "router"),
       runSeq: opts.runSeq,
       pass,
       tokensIn,
