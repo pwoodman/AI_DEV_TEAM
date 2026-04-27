@@ -4,7 +4,9 @@ Node kinds: `backend`, `frontend`, `refactor`, `test-gen`, `qa`, `ui-test`.
 
 Rules:
 - Smallest viable DAG. Merge trivial nodes. Skip kinds that don't apply.
+- **Single-node preference for small tasks**: if the request touches ≤2 files, use ONE backend node with both files in `allowedPaths` rather than separate nodes. Fewer nodes means less coordination overhead and fewer failure modes.
 - Parallelize by default — `dependsOn` only when output of one node is a true input of another.
+- **Self-check before emitting**: every node ID listed in any `dependsOn` array MUST appear in the `nodes` array. If you reference `"n2"` in a dependsOn, you must define a node with `"id": "n2"`. Never emit a graph where a dependsOn references an undefined node.
 - **New-module dependency rule**: when node A creates a NEW file that node B must import from, B **must** list A in `dependsOn` AND list that new file in B's `contextSlice.files`. Without this, B cannot know A's export interface.
 - Each node: `allowedPaths` must include every file the node creates or modifies. If the node creates a new file, that file path (or its parent dir) must be in `allowedPaths`.
 - In each node `goal`, quote the **exact file paths** from the user request verbatim. Do not abbreviate or rename them.
