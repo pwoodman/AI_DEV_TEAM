@@ -10,6 +10,7 @@ export const ValidatorNameSchema = z.enum([
   "ui-tests",
   "security",
   "deployment-readiness",
+  "lang-adapter",
 ]);
 export type ValidatorName = z.infer<typeof ValidatorNameSchema>;
 

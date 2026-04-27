@@ -123,6 +123,11 @@ describe("ValidationResult", () => {
     const r = ValidationResultSchema.parse({ validator: "schema", ok: true, durationMs: 1 });
     expect(r.issues).toEqual([]);
   });
+
+  it("accepts lang-adapter as a validator name", () => {
+    const r = ValidationResultSchema.parse({ validator: "lang-adapter", ok: true, durationMs: 1 });
+    expect(r.validator).toBe("lang-adapter");
+  });
 });
 
 describe("DecisionLogEntry", () => {
