@@ -760,13 +760,12 @@ export class Orchestrator {
           ? [...effectiveContextPaths, ...testReadPaths]
           : effectiveContextPaths;
 
-        // Smart context building: use extra budget when contextSlice has symbols
+        // Smart context building: use extra budget when contextSlice has symbols.
+        // Always load allReadPaths so downstream nodes see the workspace state
+        // (e.g. router.ts must see audit.ts created by an upstream node); the
+        // contextSlice adds supplemental focused files on top via base-agent.
         const budgetOverride = hasSlice ? DEFAULT_TOTAL_BYTES + SYMBOL_CONTEXT_BUDGET : undefined;
-        const files = hasSlice
-          ? testReadPaths.length > 0
-            ? await buildContextFiles(paths.workspace, testReadPaths, 4_000)
-            : []
-          : await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
+        const files = await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
