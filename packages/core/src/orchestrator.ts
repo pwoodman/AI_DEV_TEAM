@@ -532,11 +532,11 @@ export class Orchestrator {
     // Enforce explicit "Allowed paths:" constraint from the request text.
     // When a fixture/prompt declares specific paths, the architect must not
     // generate nodes (e.g. test-gen) that write outside those paths.
-    const explicitPathMatch = req.request.match(/allowed paths?:\s*([^\n.]+)/i);
+    const explicitPathMatch = req.request.match(/allowed paths?:\s*([^\n]+)/i);
     if (explicitPathMatch?.[1]) {
       const declaredPaths = explicitPathMatch[1]
         .split(",")
-        .map((p) => p.trim().replace(/`/g, ""))
+        .map((p) => p.trim().replace(/`/g, "").replace(/\.+$/, ""))
         .filter((p) => p.length > 0);
       if (declaredPaths.length > 0) {
         const pathOverlaps = (nodePath: string, declared: string[]): boolean =>
@@ -549,6 +549,19 @@ export class Orchestrator {
         for (const node of effectiveGraph.nodes) {
           const clipped = node.allowedPaths.filter((p) => pathOverlaps(p, declaredPaths));
           if (clipped.length > 0) node.allowedPaths = clipped;
+        }
+        // Expand backend nodes to include ALL declared paths — the architect
+        // may forget to list every file (e.g. router.ts alongside audit.ts),
+        // but declared paths are the full scope of what this task is allowed
+        // to touch, so a backend node must be able to reach all of them.
+        for (const node of effectiveGraph.nodes) {
+          if (node.kind === "backend") {
+            for (const dp of declaredPaths) {
+              if (!node.allowedPaths.includes(dp)) {
+                node.allowedPaths.push(dp);
+              }
+            }
+          }
         }
       }
     }

@@ -69,7 +69,12 @@ export const AgentOutputSchema = z.object({
     .pipe(z.string().max(2000))
     .optional()
     .default(""),
-  followups: z.array(TaskNodeSchema).optional(),
+  followups: z
+    .array(z.unknown())
+    .transform((arr) => arr.filter((item): item is z.infer<typeof TaskNodeSchema> =>
+      TaskNodeSchema.safeParse(item).success,
+    ))
+    .optional(),
   decisions: z.array(DecisionDraftSchema).optional(),
   needsUserInput: z.object({ reason: z.string() }).optional(),
 });

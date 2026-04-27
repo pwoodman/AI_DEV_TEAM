@@ -9,6 +9,21 @@ Rules:
 - **NodeNext imports**: when the tsconfig uses `"moduleResolution": "NodeNext"` or `"Node16"`, all relative imports in TypeScript files must use explicit `.js` extensions: `import x from './foo.js'` not `import x from './foo'`.
 - **Pagination** (`?page=&pageSize=`): `page = Number(q.page??'1')||1`, `pageSize = Math.min(Number(q.pageSize??'10')||10, 50)`. The `||` fallback guards NaN from non-numeric inputs. Sort by stable key before slicing. `start=(page-1)*pageSize`. Return `{items,page,pageSize,total}`; out-of-range page returns `items:[]`.
 - **Rate limiter window expiry**: use `>` not `>=` — `if(now-windowStart > windowMs)` resets the window. At exactly `windowMs` elapsed the window has NOT yet expired.
+- **Type fidelity**: When a type is already exported by a file in context (e.g., `export type Parser = { parse(input: string): string[] }` in `src/parsers/csv.ts`), import it with `import type { Parser } from "./parsers/csv.js"` instead of redefining it. Never invent a new type alias for a concept that already exists. Critical: `{ parse(input: string): string[] }` is an object-with-method type, NOT the same as a function type `(input: string) => string[]`. When creating a new registry/store file, import the item type from wherever it's defined — don't define your own.
+
+  **Registry pattern — correct:**
+  ```typescript
+  // plugin-registry.ts
+  import type { Parser } from "./parsers/csv.js";  // import from existing definition
+  class PluginRegistry { private plugins = new Map<string, Parser>(); ... }
+  ```
+  **Registry pattern — WRONG (do not do this):**
+  ```typescript
+  // plugin-registry.ts
+  type Parser = (input: string) => string[];  // ❌ redefines as function type
+  interface Parser { parse(input: string): string[] }  // ❌ redefines instead of importing
+  ```
+- **File location fidelity**: Never move or rename an existing file. If context contains `src/parsers/csv.ts`, patch it as `src/parsers/csv.ts` — never create `src/csv.ts` as a replacement. New files go in whatever directory the goal specifies; existing files stay where they are.
 
 ## Pagination example
 
