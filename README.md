@@ -74,6 +74,10 @@ pnpm --filter @amase/cli start -- run  "add a /health endpoint" --workspace ./so
 
 ≥1.5× throughput, ≤60% token use vs single-agent baseline, ≥90% task success, ≤15% retry rate, ≥70% parallelization efficiency, ≥90% UI interaction coverage when UI artifacts exist.
 
+## Benchmarks
+
+See [`docs/bench/README.md`](docs/bench/README.md) for the bench runner, headline interpretation, and local/CI invocation.
+
 ## Status
 
 Walking-skeleton complete and green:
