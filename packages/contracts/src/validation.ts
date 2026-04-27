@@ -48,6 +48,10 @@ export const DecisionLogEntrySchema = z.object({
     "agent.error",
     "architect.question",
     "user.answer",
+    "run.started",
+    "node.enqueued",
+    "agent.llm.response",
+    "run.completed",
   ]),
   data: z.record(z.unknown()).default({}),
 });
