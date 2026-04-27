@@ -1,0 +1,73 @@
+diff --git a/src/router.ts b/src/router.ts
+index 5ae86e7..fea1fd2 100644
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
+ import { z } from "zod";
+ import type { Item } from "./item.js";
+ import { store } from "./store.js";
++import { appendAudit, queryAudit } from "./audit.js";
+ 
+ export type Req = { method: string; path: string; body?: unknown; query?: Record<string, string> };
+ export type Res = { status: number; body: unknown };
+@@ -22,8 +23,29 @@ export function handle(req: Req): Res {
+     if (!parsed.success) return { status: 400, body: { error: parsed.error.message } };
+     const item: Item = { id: randomUUID(), ...parsed.data };
+     store.push(item);
++    appendAudit({ action: "create", entityId: item.id });
+     return { status: 201, body: item };
+   }
+ 
++  if (req.method === "GET" && req.path === "/audit") {
++    const filter: { action?: string; entityId?: string } = {};
++    if (req.query?.action) filter.action = req.query.action;
++    if (req.query?.entityId) filter.entityId = req.query.entityId;
++    const f = Object.keys(filter).length > 0 ? filter : undefined;
++    return { status: 200, body: queryAudit(f) };
++  }
++
++  const idMatch = req.path.match(/^\/items\/([^/]+)$/);
++  if (idMatch) {
++    const id = idMatch[1];
++    if (req.method === "DELETE") {
++      const idx = store.findIndex((item) => item.id === id);
++      if (idx === -1) return { status: 404, body: { error: "not found" } };
++      store.splice(idx, 1);
++      appendAudit({ action: "delete", entityId: id });
++      return { status: 204, body: null };
++    }
++  }
++
+   return { status: 404, body: { error: "not found" } };
+ }
+diff --git a/src/audit.ts b/src/audit.ts
+new file mode 100644
+index 0000000..4768f12
+--- /dev/null
++++ b/src/audit.ts
+@@ -0,0 +1,25 @@
++import { randomUUID } from "node:crypto";
++
++export type AuditEntry = {
++  eventId: string;
++  action: "create" | "delete";
++  entityId: string;
++  timestamp: number;
++};
++
++const log: AuditEntry[] = [];
++
++export function appendAudit(entry: Omit<AuditEntry, "eventId" | "timestamp">): void {
++  log.push({ eventId: randomUUID(), timestamp: Date.now(), ...entry });
++}
++
++export function queryAudit(filter?: { action?: string; entityId?: string }): AuditEntry[] {
++  let entries = [...log];
++  if (filter?.action) entries = entries.filter((e) => e.action === filter.action);
++  if (filter?.entityId) entries = entries.filter((e) => e.entityId === filter.entityId);
++  return entries.sort((a, b) => a.timestamp - b.timestamp);
++}
++
++export function clearAudit(): void {
++  log.length = 0;
++}

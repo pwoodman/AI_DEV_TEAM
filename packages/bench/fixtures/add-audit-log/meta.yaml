@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: "Add DELETE /items/:id, create src/audit.ts with append/query/clear, wire audit into POST and DELETE routes, expose GET /audit with action/entityId filtering."
