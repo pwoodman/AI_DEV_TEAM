@@ -8,6 +8,7 @@ import { DAGStore, DecisionLog, runPaths } from "@amase/memory";
 import { patchSafetyValidator, schemaValidator } from "@amase/validators";
 import { diffSimilarity as computeDiffSimilarity } from "../diff-similarity.js";
 import type { Fixture } from "../fixtures.js";
+import { runTypecheck } from "../typecheck-gate.js";
 import type { BenchResult, RunOpts } from "../types.js";
 
 const BENCH_WORKSPACES_DIR = join(process.cwd(), ".amase", "bench-workspaces");
@@ -294,10 +295,16 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
 
       // Execute fixture tests against the produced workspace to score pass/fail.
       debugLog("amase.tests.start", { taskId: fx.id, workspace: paths.workspace });
-      const testResult = await runFixtureTests(paths.workspace);
-      debugLog("amase.tests.done", { taskId: fx.id, pass: testResult.pass, error: testResult.error });
-      pass = testResult.pass;
-      if (!pass && !error) error = testResult.error;
+      const tcResult = await runTypecheck(paths.workspace, fx.meta.language);
+      if (!tcResult.ok) {
+        pass = false;
+        error = error ?? `typecheck: ${tcResult.error ?? "failed"}`;
+      } else {
+        const testResult = await runFixtureTests(paths.workspace);
+        debugLog("amase.tests.done", { taskId: fx.id, pass: testResult.pass, error: testResult.error });
+        pass = testResult.pass;
+        if (!pass && !error) error = testResult.error;
+      }
     } catch (e) {
       error = (e as Error).message;
       debugLog("amase.run.error", { taskId: fx.id, error });

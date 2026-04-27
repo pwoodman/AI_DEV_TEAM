@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { dirname, join } from "node:path";
 import { diffSimilarity as computeDiffSimilarity } from "../diff-similarity.js";
 import type { Fixture } from "../fixtures.js";
+import { runTypecheck } from "../typecheck-gate.js";
 import type { BenchResult, RunOpts } from "../types.js";
 
 const BENCH_WORKSPACES_DIR = join(process.cwd(), ".amase", "bench-workspaces");
@@ -209,9 +210,15 @@ export async function runSuperpowers(fx: Fixture, opts: RunOpts): Promise<BenchR
       error = stderrBuf.trim().slice(0, 500);
     }
 
-    const testResult = await runFixtureTests(workspace);
-    pass = testResult.pass;
-    if (!pass && !error) error = testResult.error;
+    const tcResult = await runTypecheck(workspace, fx.meta.language);
+    if (!tcResult.ok) {
+      pass = false;
+      error = error ?? `typecheck: ${tcResult.error ?? "failed"}`;
+    } else {
+      const testResult = await runFixtureTests(workspace);
+      pass = testResult.pass;
+      if (!pass && !error) error = testResult.error;
+    }
   } catch (e) {
     error = (e as Error).message;
   }
