@@ -257,6 +257,7 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
     let cacheReadTokens = 0;
     let cacheWriteTokens = 0;
     let retries = 0;
+    let validatorFailures = 0;
     let error: string | undefined;
 
     try {
@@ -290,8 +291,11 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
         if (entry.event === "node.retried") {
           retries += 1;
         }
+        if (entry.event === "validator.failed") {
+          validatorFailures += 1;
+        }
       }
-      debugLog("amase.metrics.aggregated", { taskId: fx.id, tokensIn, tokensOut, cacheReadTokens, cacheWriteTokens, retries, logEntries: entries.length });
+      debugLog("amase.metrics.aggregated", { taskId: fx.id, tokensIn, tokensOut, cacheReadTokens, cacheWriteTokens, retries, validatorFailures, logEntries: entries.length });
 
       // Execute fixture tests against the produced workspace to score pass/fail.
       debugLog("amase.tests.start", { taskId: fx.id, workspace: paths.workspace });
@@ -335,7 +339,7 @@ export async function runAmase(fx: Fixture, opts: RunOpts): Promise<BenchResult>
       tokensIn,
       tokensOut,
       tokensCached: cacheReadTokens,
-      validatorFailures: 0, // real value wired in Task 7
+      validatorFailures,
       wallMs,
       diffSimilarity,
       retries,
