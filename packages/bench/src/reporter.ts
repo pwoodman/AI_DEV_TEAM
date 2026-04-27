@@ -1,48 +1,131 @@
-import type { BenchResult, Stack } from "./types.js";
+import { mean, stdev, welchCI95, welchPValueTwoSided } from "./stats.js";
+import type { BenchResult, Fairness, HeadlineReport, Stack } from "./types.js";
 
-// ---------------------------------------------------------------------------
-// Legacy headline (kept for programmatic callers)
-// ---------------------------------------------------------------------------
-export type Headline =
-  | { status: "insufficient_signal"; bothPassed: number }
-  | { status: "regression"; passRateDelta: number }
-  | { status: "ok"; tokenDelta: number; timeDelta: number; passRateDelta: number; bothPassed: number };
+const WALL_MS_TARGET = 0.3; // ≥30% faster
+const TOKEN_TARGET = 0.3;   // ≤70% token use == ≥30% fewer tokens
 
-export function reportHeadline(results: BenchResult[]): Headline {
-  const byTask = new Map<string, { amase?: BenchResult; superpowers?: BenchResult }>();
+export interface ReportOpts {
+  fairness: Fairness;
+  samplesPerCell: number;
+}
+
+function deltaFraction(amase: number[], sp: number[]) {
+  const mA = mean(amase);
+  const mS = mean(sp);
+  const delta = mS === 0 ? 0 : (mS - mA) / mS; // positive = AMASE better
+  const [ciLo, ciHi] = welchCI95(sp, amase);
+  const ci95: [number, number] = mS === 0 ? [0, 0] : [ciLo / mS, ciHi / mS];
+  const pValue = welchPValueTwoSided(amase, sp);
+  return {
+    amase: { mean: mA, stdev: amase.length >= 2 ? stdev(amase) : 0 },
+    superpowers: { mean: mS, stdev: sp.length >= 2 ? stdev(sp) : 0 },
+    delta,
+    ci95,
+    pValue,
+  };
+}
+
+function emptyCompare() {
+  return {
+    amase: { mean: 0, stdev: 0 },
+    superpowers: { mean: 0, stdev: 0 },
+    delta: 0,
+    ci95: [0, 0] as [number, number],
+    pValue: 1,
+  };
+}
+
+export function reportHeadline(
+  results: BenchResult[],
+  opts: ReportOpts,
+): HeadlineReport {
+  const byTaskStack = new Map<string, BenchResult[]>();
+  const key = (r: BenchResult) => `${r.taskId}::${r.stack}`;
   for (const r of results) {
-    const entry = byTask.get(r.taskId) ?? {};
-    if (r.stack === "amase" || r.stack === "superpowers") entry[r.stack] = r;
-    byTask.set(r.taskId, entry);
+    const k = key(r);
+    const arr = byTaskStack.get(k) ?? [];
+    arr.push(r);
+    byTaskStack.set(k, arr);
   }
-  let amasePassed = 0;
-  let spPassed = 0;
-  let tokenA = 0;
-  let tokenS = 0;
-  let timeA = 0;
-  let timeS = 0;
-  let bothPassed = 0;
-  const total = byTask.size;
-  for (const [, { amase, superpowers }] of byTask) {
-    if (amase?.pass) amasePassed++;
-    if (superpowers?.pass) spPassed++;
-    if (amase?.pass && superpowers?.pass) {
-      bothPassed++;
-      tokenA += amase.tokensIn + amase.tokensOut;
-      tokenS += superpowers.tokensIn + superpowers.tokensOut;
-      timeA += amase.wallMs;
-      timeS += superpowers.wallMs;
+
+  const taskIds = [...new Set(results.map((r) => r.taskId))];
+
+  const fullyGreenTasks = taskIds.filter((tid) => {
+    const a = byTaskStack.get(`${tid}::amase`) ?? [];
+    const s = byTaskStack.get(`${tid}::superpowers`) ?? [];
+    return a.length > 0 && s.length > 0 && a.every((r) => r.pass) && s.every((r) => r.pass);
+  });
+
+  const amasePassRate =
+    results.filter((r) => r.stack === "amase" && r.pass).length /
+    Math.max(1, results.filter((r) => r.stack === "amase").length);
+  const spPassRate =
+    results.filter((r) => r.stack === "superpowers" && r.pass).length /
+    Math.max(1, results.filter((r) => r.stack === "superpowers").length);
+
+  if (amasePassRate < spPassRate) {
+    return {
+      fairness: opts.fairness,
+      samplesPerCell: opts.samplesPerCell,
+      tasks: taskIds.length,
+      bothPassedAll: fullyGreenTasks.length,
+      wallMs: emptyCompare(),
+      tokens: emptyCompare(),
+      passRate: { amase: amasePassRate, superpowers: spPassRate },
+      verdict: "regression",
+      notes: [`AMASE pass rate ${amasePassRate.toFixed(2)} < superpowers ${spPassRate.toFixed(2)}`],
+    };
+  }
+
+  if (fullyGreenTasks.length < 5) {
+    return {
+      fairness: opts.fairness,
+      samplesPerCell: opts.samplesPerCell,
+      tasks: taskIds.length,
+      bothPassedAll: fullyGreenTasks.length,
+      wallMs: emptyCompare(),
+      tokens: emptyCompare(),
+      passRate: { amase: amasePassRate, superpowers: spPassRate },
+      verdict: "insufficient_signal",
+      notes: [`Only ${fullyGreenTasks.length} task(s) fully green in both stacks; need >=5.`],
+    };
+  }
+
+  const amaseWall: number[] = [];
+  const spWall: number[] = [];
+  const amaseTok: number[] = [];
+  const spTok: number[] = [];
+  for (const tid of fullyGreenTasks) {
+    for (const r of byTaskStack.get(`${tid}::amase`) ?? []) {
+      amaseWall.push(r.wallMs);
+      amaseTok.push(r.tokensIn + r.tokensOut);
+    }
+    for (const r of byTaskStack.get(`${tid}::superpowers`) ?? []) {
+      spWall.push(r.wallMs);
+      spTok.push(r.tokensIn + r.tokensOut);
     }
   }
-  const passRateDelta = total === 0 ? 0 : (amasePassed - spPassed) / total;
-  if (passRateDelta < 0) return { status: "regression", passRateDelta };
-  if (bothPassed < 5) return { status: "insufficient_signal", bothPassed };
+
+  const wall = deltaFraction(amaseWall, spWall);
+  const tokens = deltaFraction(amaseTok, spTok);
+  const hitTargets = wall.delta >= WALL_MS_TARGET && tokens.delta >= TOKEN_TARGET;
+  const verdict: HeadlineReport["verdict"] = hitTargets ? "ok" : "fail_targets";
+
   return {
-    status: "ok",
-    tokenDelta: tokenS === 0 ? 0 : (tokenS - tokenA) / tokenS,
-    timeDelta: timeS === 0 ? 0 : (timeS - timeA) / timeS,
-    passRateDelta,
-    bothPassed,
+    fairness: opts.fairness,
+    samplesPerCell: opts.samplesPerCell,
+    tasks: taskIds.length,
+    bothPassedAll: fullyGreenTasks.length,
+    wallMs: wall,
+    tokens,
+    passRate: { amase: amasePassRate, superpowers: spPassRate },
+    verdict,
+    notes: hitTargets
+      ? []
+      : [
+          `wallMs delta ${(wall.delta * 100).toFixed(1)}% (target ≥30%)`,
+          `token delta ${(tokens.delta * 100).toFixed(1)}% (target ≥30%)`,
+        ],
   };
 }
 
@@ -141,7 +224,7 @@ export function printTable(results: BenchResult[], descriptions: Map<string, str
     for (const s of stacks) {
       const d = t.stacks[s];
       if (d && !d.pass && d.error) {
-        const errLine = `  [${s}] ${d.error.replace(/\[[^m]*m/g, "").slice(0, NAME_W + DESC_W - 6).trim()}`;
+        const errLine = `  [${s}] ${d.error.replace(/\[[^m]*m/g, "").slice(0, NAME_W + DESC_W - 6).trim()}`;
         console.log(`│ ${pad(errLine, NAME_W + DESC_W + 3 + stacks.length * (STACK_W + 3))} │`);
       }
     }
