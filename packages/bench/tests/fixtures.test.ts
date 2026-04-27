@@ -10,10 +10,12 @@ const EXPECTED_IDS = [
   "add-pagination-to-list-endpoint",
   "add-typed-error",
   "add-validated-endpoint-with-zod",
+  "add-validation-to-all-routes",
   "add-zod-schema",
   "build-rate-limiter-middleware",
   "fix-failing-vitest",
   "handle-null-input",
+  "implement-plugin-system",
   "migrate-component-prop-shape",
   "rename-package-export",
 ];

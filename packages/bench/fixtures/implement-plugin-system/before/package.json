@@ -1,0 +1,6 @@
+{
+  "name": "fixture-implement-plugin-system",
+  "type": "module",
+  "private": true,
+  "devDependencies": { "vitest": "*" }
+}

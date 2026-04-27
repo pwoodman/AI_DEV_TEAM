@@ -1,0 +1,46 @@
+--- a/src/router.ts
++++ b/src/router.ts
+@@ -1,17 +1,38 @@
++import { z } from "zod";
++
+ export type Req = { method: string; path: string; body?: Record<string, unknown>; params?: Record<string, string> };
+ export type Res = { status: number; body: unknown };
+
++const CreateUserSchema = z.object({ name: z.string().min(1), email: z.string().includes("@") });
++const CreatePostSchema = z.object({ title: z.string().min(1), userId: z.number().int().positive() });
++const UpdatePostBodySchema = z.object({ title: z.string().min(1) });
++const IdParamSchema = z.object({ id: z.string().regex(/^\d+$/) });
++const CreateCommentSchema = z.object({ postId: z.number().int().positive(), text: z.string().min(1) });
++
++function badRequest(msg: string): Res { return { status: 400, body: { error: msg } }; }
++
+ export function handle(req: Req): Res {
+   if (req.method === "POST" && req.path === "/users") {
++    const r = CreateUserSchema.safeParse(req.body);
++    if (!r.success) return badRequest(r.error.message);
+     return { status: 201, body: { id: 1, ...req.body } };
+   }
+   if (req.method === "POST" && req.path === "/posts") {
++    const r = CreatePostSchema.safeParse(req.body);
++    if (!r.success) return badRequest(r.error.message);
+     return { status: 201, body: { id: 1, ...req.body } };
+   }
+   if (req.method === "PUT" && req.path.startsWith("/posts/")) {
++    const rp = IdParamSchema.safeParse(req.params);
++    if (!rp.success) return badRequest(rp.error.message);
++    const rb = UpdatePostBodySchema.safeParse(req.body);
++    if (!rb.success) return badRequest(rb.error.message);
+     return { status: 200, body: { id: req.params?.id, ...req.body } };
+   }
+   if (req.method === "DELETE" && req.path.startsWith("/users/")) {
++    const r = IdParamSchema.safeParse(req.params);
++    if (!r.success) return badRequest(r.error.message);
+     return { status: 204, body: null };
+   }
+   if (req.method === "POST" && req.path === "/comments") {
++    const r = CreateCommentSchema.safeParse(req.body);
++    if (!r.success) return badRequest(r.error.message);
+     return { status: 201, body: { id: 1, ...req.body } };
+   }
+   return { status: 404, body: { error: "not found" } };
+ }

@@ -1,0 +1,97 @@
+--- a/src/pipeline.ts
++++ b/src/pipeline.ts
+@@ -1,13 +1,10 @@
+-import { csvParser } from "./parsers/csv.js";
+-import { jsonParser } from "./parsers/json.js";
+-import { tsvParser } from "./parsers/tsv.js";
+-import { xmlParser } from "./parsers/xml.js";
++import { registry } from "./plugin-registry.js";
+
+ export type Format = "csv" | "json" | "xml" | "tsv";
+
+ export function parse(input: string, format: Format): string[] {
+-  switch (format) {
+-    case "csv": return csvParser.parse(input);
+-    case "json": return jsonParser.parse(input);
+-    case "xml": return xmlParser.parse(input);
+-    case "tsv": return tsvParser.parse(input);
+-    default: throw new Error(`unknown format: ${format}`);
+-  }
++  const parser = registry.get(format);
++  if (!parser) throw new Error(`unknown format: ${format}`);
++  return parser.parse(input);
+ }
+--- /dev/null
++++ b/src/plugin-registry.ts
+@@ -0,0 +1,16 @@
++import type { Parser } from "./parsers/csv.js";
++
++export class PluginRegistry {
++  private plugins = new Map<string, Parser>();
++  register(name: string, parser: Parser): void {
++    this.plugins.set(name, parser);
++  }
++  get(name: string): Parser | undefined {
++    return this.plugins.get(name);
++  }
++}
++
++export const registry = new PluginRegistry();
+--- a/src/parsers/csv.ts
++++ b/src/parsers/csv.ts
+@@ -1,5 +1,9 @@
++import { registry } from "../plugin-registry.js";
++
+ export type Parser = { parse(input: string): string[] };
+
+ export const csvParser: Parser = {
+   parse(input: string): string[] {
+     return input.split(",").map((s) => s.trim());
+   },
+ };
++
++registry.register("csv", csvParser);
+--- a/src/parsers/json.ts
++++ b/src/parsers/json.ts
+@@ -1,5 +1,9 @@
++import { registry } from "../plugin-registry.js";
++
+ export type Parser = { parse(input: string): string[] };
+
+ export const jsonParser: Parser = {
+   parse(input: string): string[] {
+     const arr = JSON.parse(input) as unknown;
+     if (!Array.isArray(arr)) throw new Error("expected array");
+     return arr.map(String);
+   },
+ };
++
++registry.register("json", jsonParser);
+--- a/src/parsers/xml.ts
++++ b/src/parsers/xml.ts
+@@ -1,5 +1,9 @@
++import { registry } from "../plugin-registry.js";
++
+ export type Parser = { parse(input: string): string[] };
+
+ export const xmlParser: Parser = {
+   parse(input: string): string[] {
+     return Array.from(input.matchAll(/<item>(.*?)<\/item>/g)).map((m) => m[1] ?? "");
+   },
+ };
++
++registry.register("xml", xmlParser);
+--- a/src/parsers/tsv.ts
++++ b/src/parsers/tsv.ts
+@@ -1,5 +1,9 @@
++import { registry } from "../plugin-registry.js";
++
+ export type Parser = { parse(input: string): string[] };
+
+ export const tsvParser: Parser = {
+   parse(input: string): string[] {
+     return input.split("\t").map((s) => s.trim());
+   },
+ };
++
++registry.register("tsv", tsvParser);

@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Replace four hardcoded data parsers with a self-registering plugin system where each parser registers itself.

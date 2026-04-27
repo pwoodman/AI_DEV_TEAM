@@ -1,0 +1,7 @@
+{
+  "name": "fixture-add-validation-to-all-routes",
+  "type": "module",
+  "private": true,
+  "dependencies": { "zod": "*" },
+  "devDependencies": { "vitest": "*" }
+}

@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Add Zod request validation to all five routes, returning 400 on invalid input.
