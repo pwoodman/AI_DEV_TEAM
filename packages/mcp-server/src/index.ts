@@ -10,12 +10,10 @@ import { ALL_SKILLS, resolveSkills } from "@amase/skills";
 import {
   type Validator,
   buildSecurityValidator,
-  lintValidator,
+  langAdapterValidator,
   patchSafetyValidator,
   schemaValidator,
-  typecheckValidator,
   uiTestsValidator,
-  unitTestsValidator,
 } from "@amase/validators";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -80,9 +78,7 @@ function buildValidators(): Validator[] {
   return [
     schemaValidator,
     patchSafetyValidator,
-    typecheckValidator,
-    lintValidator,
-    unitTestsValidator,
+    langAdapterValidator,
     uiTestsValidator,
     buildSecurityValidator(),
   ];
