@@ -1,0 +1,42 @@
+--- a/src/user-store.ts
++++ b/src/user-store.ts
+@@ export function getUser
+-  const numericId = parseInt(id);
+-  if (numericId <= 0 || isNaN(numericId)) return undefined;
+-  return users.get(String(numericId));
++  if (!id) return undefined;
++  return users.get(id);
+
+@@ export function addUser
+-  if ((user.id as unknown as number) <= 0) throw new Error("invalid id");
++  if (!user.id) throw new Error("invalid id");
+
+--- a/src/session.ts
++++ b/src/session.ts
+@@ export function createSession
+-    userId: 1,
++    userId,
+
+@@ export function isValidSession
+-  return (session.userId as unknown as number) > 0;
++  return session.userId.length > 0;
+
+--- a/src/auth.ts
++++ b/src/auth.ts
+@@ export function authenticate
+-  if ((userId as unknown as number) <= 0) return false;
++  if (!userId) return false;
+
+@@ export function validateUserId
+-  return (id as unknown as number) > 0;
++  return id.length > 0;
+
+--- a/src/api.ts
++++ b/src/api.ts
+@@ export function handleGetUser
+-  const user = getUser(Number(req.userId) as unknown as UserId);
++  const user = getUser(req.userId);
+
+@@ export function handleAddUser
+-  const id: UserId = Number(req.userId) as unknown as UserId;
++  const id: UserId = req.userId;

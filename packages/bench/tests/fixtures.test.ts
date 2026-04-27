@@ -13,11 +13,13 @@ const EXPECTED_IDS = [
   "add-validation-to-all-routes",
   "add-zod-schema",
   "build-rate-limiter-middleware",
+  "fix-cascading-type-errors",
   "fix-failing-vitest",
   "handle-null-input",
   "implement-plugin-system",
   "migrate-component-prop-shape",
   "rename-package-export",
+  "split-god-module",
 ];
 
 describe("fixtures", () => {

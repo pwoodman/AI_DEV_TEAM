@@ -1,0 +1,3 @@
+category: large
+language: ts
+summary: Fix cascading type errors from a UserId refactor (number→string) across 4 files plus a hidden runtime bug in the comparison logic.

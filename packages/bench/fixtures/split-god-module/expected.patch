@@ -1,0 +1,38 @@
+--- /dev/null
++++ b/src/parser.ts
+@@ -0,0 +1 @@
++export interface ParsedRequest { userId: string; action: string; payload: Record<string, unknown>; }
++export function parseRequest(raw: string): ParsedRequest { ... }
+
+--- /dev/null
++++ b/src/response.ts
+@@ -0,0 +1 @@
++export function formatOk(data: unknown): string { return JSON.stringify({ ok: true, data }); }
++export function formatError(message: string): string { return JSON.stringify({ ok: false, error: message }); }
+
+--- /dev/null
++++ b/src/validator.ts
+@@ -0,0 +1 @@
++export interface ValidationResult { ok: boolean; errors: string[]; }
++export function validateRequest(req: ParsedRequest): ValidationResult { ... }
+
+--- /dev/null
++++ b/src/permissions.ts
+@@ -0,0 +1 @@
++export function checkPermission(userId: string, action: string): boolean { ... }
+
+--- /dev/null
++++ b/src/rate-limiter.ts
+@@ -0,0 +1 @@
++export interface RateLimitResult { allowed: boolean; remaining: number; resetInMs: number; }
++export function checkRateLimit(userId: string): RateLimitResult { ... }
+
+--- a/src/app.ts
++++ b/src/app.ts
+@@ import
+-import { parseRequest, formatOk, formatError, validateRequest, checkPermission, checkRateLimit } from "./god.js";
++import { parseRequest } from "./parser.js";
++import { formatOk, formatError } from "./response.js";
++import { validateRequest } from "./validator.js";
++import { checkPermission } from "./permissions.js";
++import { checkRateLimit } from "./rate-limiter.js";
