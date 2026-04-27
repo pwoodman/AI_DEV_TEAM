@@ -1,0 +1,1 @@
+{"runId":"2026-04-25T00-14-05-882Z","timestamp":"2026-04-25T00:24:56.340Z","taskId":"rename-package-export","stack":"superpowers","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":26,"tokensOut":1940,"tokensCached":0,"validatorFailures":0,"wallMs":38907,"diffSimilarity":0.3563218390804598,"retries":0}

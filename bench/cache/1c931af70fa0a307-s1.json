@@ -1,0 +1,1 @@
+{"runId":"2026-04-27T01-36-13-985Z","timestamp":"2026-04-27T01:37:04.589Z","taskId":"add-cli-flag","stack":"superpowers","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":30,"tokensOut":1408,"tokensCached":512342,"validatorFailures":0,"wallMs":50556,"diffSimilarity":0.2631578947368421,"retries":0}

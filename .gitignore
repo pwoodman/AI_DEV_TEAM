@@ -1,6 +1,7 @@
 node_modules
 dist
 .amase
+bench/results
 *.log
 .env
 .env.local

@@ -18,7 +18,7 @@ export interface RunConfig {
   fairness?: Fairness; // default "primary"
 }
 
-const CACHE_DIR = join(process.cwd(), ".amase", "bench-cache");
+const CACHE_DIR = join(process.cwd(), "bench", "cache");
 
 function cacheKey(taskId: string, stack: Stack, model: string, fairness: string, prompt: string): string {
   const hash = createHash("sha256").update(`${taskId}:${stack}:${model}:${fairness}:${prompt}`).digest("hex").slice(0, 16);

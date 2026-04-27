@@ -1,0 +1,1 @@
+{"runId":"2026-04-26T01-20-24-155Z","timestamp":"2026-04-26T01:25:23.490Z","taskId":"rename-package-export","stack":"stock","model":"claude-sonnet-4-6","runSeq":1,"pass":true,"tokensIn":395,"tokensOut":234,"tokensCached":0,"validatorFailures":0,"wallMs":4669,"diffSimilarity":0.3563218390804598,"retries":0}
