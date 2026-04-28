@@ -2,6 +2,9 @@ node_modules
 dist
 .amase
 bench/results
+bench/*.json
+bench/cache/
+packages/bench/bench/
 *.log
 .env
 .env.local
