@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import type { Stats } from "node:fs";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 function debugLog(event: string, data: Record<string, unknown>): void {
@@ -38,6 +37,8 @@ import {
   buildDeploymentReadinessGate,
   buildSkillChecksValidator,
 } from "@amase/validators";
+import { buildContextFiles } from "./context-builder.js";
+import { ContextAssembler } from "./context-assembler.js";
 import { type RouterOptions, routeNode } from "./router.js";
 import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
@@ -46,10 +47,6 @@ import { isBlockedByQuestion } from "./speculative.js";
 // ---------------------------------------------------------------------------
 // Context packing constants
 // ---------------------------------------------------------------------------
-const MAX_FILE_BYTES_SMALL = 6_000; // files under 6KB: include fully
-const MAX_FILE_BYTES_LARGE = 12_000; // files 6-12KB: smart slice
-const MAX_FILE_BYTES_CAP = 18_000; // absolute cap per file
-const DEFAULT_TOTAL_BYTES = 16_000;
 const SYMBOL_CONTEXT_BUDGET = 8_000; // extra budget when contextSlice has symbols
 const DEFAULT_ALLOWED_PATH_CANDIDATES = [
   "src/",
@@ -66,68 +63,6 @@ const DEFAULT_ALLOWED_PATH_CANDIDATES = [
   "Cargo.toml",
 ];
 
-// ---------------------------------------------------------------------------
-// Smart context file loading with file-size-aware packing
-// ---------------------------------------------------------------------------
-async function buildContextFiles(
-  workspace: string,
-  allowedPaths: string[],
-  budgetOverride?: number,
-): Promise<Array<{ path: string; slice: string }>> {
-  const maxTotal = budgetOverride ?? DEFAULT_TOTAL_BYTES;
-  const out: Array<{ path: string; slice: string }> = [];
-  let total = 0;
-
-  const visit = async (rel: string): Promise<void> => {
-    if (total >= maxTotal) return;
-    const abs = join(workspace, rel);
-    let s: Stats;
-    try {
-      s = await stat(abs);
-    } catch {
-      return;
-    }
-    if (s.isDirectory()) {
-      const names = await readdir(abs);
-      await Promise.all(
-        names.map((name) => {
-          if (name === "node_modules" || name === ".amase" || name.startsWith(".git"))
-            return Promise.resolve();
-          return visit(relative(workspace, join(abs, name)).replace(/\\/g, "/"));
-        }),
-      );
-      return;
-    }
-    if (!s.isFile()) return;
-    const content = await readFile(abs, "utf8").catch(() => "");
-    if (!content) return;
-
-    let slice: string;
-    const size = content.length;
-    if (size <= MAX_FILE_BYTES_SMALL) {
-      slice = content;
-    } else if (size <= MAX_FILE_BYTES_LARGE) {
-      // Large file: grab first 60% + last 40% to preserve structure
-      const splitAt = Math.floor(size * 0.6);
-      const firstPart = content.slice(0, splitAt);
-      const lastPart = content.slice(splitAt);
-      // Take up to MAX_FILE_BYTES_LARGE total
-      const available = MAX_FILE_BYTES_LARGE - firstPart.length;
-      const truncatedLastPart = lastPart.slice(0, Math.max(0, available - 100)); // Reserve space for truncation message
-      slice = `${firstPart + truncatedLastPart}\n/* ... file truncated for context ... */`;
-    } else {
-      // Very large file: hard cap
-      slice = content.slice(0, MAX_FILE_BYTES_CAP);
-    }
-
-    if (total + slice.length > maxTotal) return;
-    total += slice.length;
-    out.push({ path: rel, slice });
-  };
-
-  await Promise.all(allowedPaths.map((p) => visit(p)));
-  return out;
-}
 
 async function inferDefaultAllowedPaths(workspacePath: string): Promise<string[]> {
   const out: string[] = [];
@@ -800,7 +735,13 @@ export class Orchestrator {
         const budgetOverride = hasSlice
           ? routeResult.contextBudget + SYMBOL_CONTEXT_BUDGET
           : routeResult.contextBudget;
-        const files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
+        let files: Array<{ path: string; slice: string }>;
+        if ((process.env.AMASE_ROUTER_MODE ?? "baseline") === "option-b") {
+          const ca = new ContextAssembler();
+          files = await ca.build(paths.workspace, finalReadPaths, budgetOverride);
+        } else {
+          files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
+        }
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
