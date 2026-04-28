@@ -13,19 +13,28 @@ export interface RouteResult {
 }
 
 const CONTEXT_BUDGET_A: Partial<Record<AgentKind, number>> = {
-  frontend:  8_000,
-  backend:  16_000,
-  refactor: 28_000,
-  qa:        8_000,
-  "ui-test": 8_000,
+  frontend:   8_000,
+  backend:   16_000,
+  refactor:  28_000,
+  qa:         8_000,
+  "ui-test":  8_000,
+  // These kinds are handled by the orchestrator's own routing; safe defaults:
+  "test-gen":   16_000,
+  security:     16_000,
+  deployment:   16_000,
+  architect:    16_000,
 };
 
 const ALLOWED_VALIDATORS_A: Partial<Record<AgentKind, ValidatorName[]>> = {
-  frontend:  ["schema", "patch-safety", "lang-adapter"],
-  backend:   ["schema", "patch-safety", "lang-adapter", "security"],
-  refactor:  ["schema", "patch-safety", "lang-adapter"],
-  qa:        ["schema", "patch-safety"],
-  "ui-test": ["schema", "patch-safety", "ui-tests"],
+  frontend:   ["schema", "patch-safety", "lang-adapter"],
+  backend:    ["schema", "patch-safety", "lang-adapter", "security"],
+  refactor:   ["schema", "patch-safety", "lang-adapter"],
+  qa:         ["schema", "patch-safety"],
+  "ui-test":  ["schema", "patch-safety", "ui-tests"],
+  "test-gen": ["schema", "patch-safety", "lang-adapter"],
+  security:   ["schema", "patch-safety", "lang-adapter", "security"],
+  deployment: ["schema", "patch-safety"],
+  architect:  [],
 };
 
 const TOKEN_BUDGET_C: Partial<Record<AgentKind, number>> = {
@@ -34,9 +43,13 @@ const TOKEN_BUDGET_C: Partial<Record<AgentKind, number>> = {
   refactor:  1_800,
   qa:         600,
   "ui-test":  600,
+  "test-gen":  800,
+  security:  1_000,
+  deployment:  600,
+  architect: 1_000,
 };
 
-const ALL_VALIDATORS: ValidatorName[] = [
+const BASE_VALIDATORS: ValidatorName[] = [
   "schema", "patch-safety", "lang-adapter", "ui-tests", "security",
 ];
 
@@ -66,7 +79,7 @@ export function routeNodeWithMode(node: TaskNode, opts: RouterOptions, mode: str
   }
 
   if (mode === "baseline") {
-    return { agent, contextBudget: 16_000, allowedValidators: [...ALL_VALIDATORS] };
+    return { agent, contextBudget: 16_000, allowedValidators: [...BASE_VALIDATORS] };
   }
 
   if (mode === "option-a" || mode === "option-b") {
@@ -87,7 +100,7 @@ export function routeNodeWithMode(node: TaskNode, opts: RouterOptions, mode: str
   }
 
   // Default fallback (unknown mode acts like baseline)
-  return { agent, contextBudget: 16_000, allowedValidators: [...ALL_VALIDATORS] };
+  return { agent, contextBudget: 16_000, allowedValidators: [...BASE_VALIDATORS] };
 }
 
 export function routeNode(node: TaskNode, opts: RouterOptions = {}): RouteResult {
