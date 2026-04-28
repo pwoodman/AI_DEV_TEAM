@@ -186,11 +186,12 @@ function isLiteEligible(goal: string): boolean {
   return !needsRich;
 }
 
-function isSingleFilePath(paths: string[]): string | null {
+/** @internal */
+export function isSingleFilePath(paths: string[]): string | null {
   if (paths.length !== 1) return null;
   const p = paths[0];
-  // Has a file extension but no trailing slash (not a directory)
-  if (/\.\w{1,6}$/.test(p) && !p.endsWith("/")) return p;
+  // Has a file extension (regex already excludes trailing-slash paths)
+  if (/\.\w{1,6}$/.test(p)) return p;
   return null;
 }
 
@@ -783,13 +784,18 @@ export class Orchestrator {
           ? [...effectiveContextPaths, ...testReadPaths]
           : effectiveContextPaths;
 
-        // Mention-path pre-filter: if allowedPaths is exactly one file, load only that file.
-        const singleFile = isSingleFilePath(effectiveContextPaths);
+        // Mention-path pre-filter: if allowedPaths is exactly one file AND the
+        // node has no upstream dependencies AND no test dirs were added, load
+        // only that file. Downstream nodes must see files created by earlier
+        // nodes, so the pre-filter is skipped whenever dependsOn is non-empty
+        // or test directories were appended.
+        const singleFile =
+          node.dependsOn.length === 0 && testReadPaths.length === 0
+            ? isSingleFilePath(effectiveContextPaths)
+            : null;
         const finalReadPaths = singleFile ? [singleFile] : allReadPaths;
 
         // Smart context building: use extra budget when contextSlice has symbols.
-        // Always load allReadPaths so downstream nodes see the workspace state
-        // (e.g. router.ts must see audit.ts created by an upstream node); the
         // contextSlice adds supplemental focused files on top via base-agent.
         const budgetOverride = hasSlice
           ? routeResult.contextBudget + SYMBOL_CONTEXT_BUDGET
