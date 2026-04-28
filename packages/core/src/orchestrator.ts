@@ -20,6 +20,7 @@ import type {
   TaskNode,
   UserAnswer,
   UserQuestion,
+  ValidatorName,
 } from "@amase/contracts";
 import { getPartitionCache, partitionKey, setPartitionCache } from "@amase/llm";
 import {
@@ -778,7 +779,9 @@ export class Orchestrator {
         // Always load allReadPaths so downstream nodes see the workspace state
         // (e.g. router.ts must see audit.ts created by an upstream node); the
         // contextSlice adds supplemental focused files on top via base-agent.
-        const budgetOverride = hasSlice ? DEFAULT_TOTAL_BYTES + SYMBOL_CONTEXT_BUDGET : undefined;
+        const budgetOverride = hasSlice
+          ? routeResult.contextBudget + SYMBOL_CONTEXT_BUDGET
+          : routeResult.contextBudget;
         const files = await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
@@ -860,7 +863,9 @@ export class Orchestrator {
           touchesFrontend: route === "frontend" || route === "ui-test",
         };
 
-        const perNodeValidators: Validator[] = [...this.deps.validators];
+        const perNodeValidators: Validator[] = this.deps.validators.filter((v) =>
+          routeResult.allowedValidators.includes(v.name as ValidatorName),
+        );
         if (resolvedSkillIds.length > 0) {
           perNodeValidators.push(
             buildSkillChecksValidator({ skillIds: resolvedSkillIds, language: node.language }),
