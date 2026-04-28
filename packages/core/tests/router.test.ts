@@ -9,25 +9,25 @@ function node(kind: TaskNode["kind"]): TaskNode {
 describe("routeNode", () => {
   it("defaults to node.kind when no opts", () => {
     for (const k of ["backend", "frontend", "refactor", "test-gen", "qa", "ui-test"] as const) {
-      expect(routeNode(node(k))).toBe(k);
+      expect(routeNode(node(k)).agent).toBe(k);
     }
   });
 
   it("skipFrontend skips frontend + ui-test", () => {
-    expect(routeNode(node("frontend"), { skipFrontend: true })).toBe("skip");
-    expect(routeNode(node("ui-test"), { skipFrontend: true })).toBe("skip");
-    expect(routeNode(node("backend"), { skipFrontend: true })).toBe("backend");
+    expect(routeNode(node("frontend"), { skipFrontend: true }).agent).toBe("skip");
+    expect(routeNode(node("ui-test"), { skipFrontend: true }).agent).toBe("skip");
+    expect(routeNode(node("backend"), { skipFrontend: true }).agent).toBe("backend");
   });
 
   it("skipBackend skips backend only", () => {
-    expect(routeNode(node("backend"), { skipBackend: true })).toBe("skip");
-    expect(routeNode(node("frontend"), { skipBackend: true })).toBe("frontend");
+    expect(routeNode(node("backend"), { skipBackend: true }).agent).toBe("skip");
+    expect(routeNode(node("frontend"), { skipBackend: true }).agent).toBe("frontend");
   });
 
   it("refactorOnly keeps refactor + qa", () => {
-    expect(routeNode(node("refactor"), { refactorOnly: true })).toBe("refactor");
-    expect(routeNode(node("qa"), { refactorOnly: true })).toBe("qa");
-    expect(routeNode(node("backend"), { refactorOnly: true })).toBe("skip");
-    expect(routeNode(node("frontend"), { refactorOnly: true })).toBe("skip");
+    expect(routeNode(node("refactor"), { refactorOnly: true }).agent).toBe("refactor");
+    expect(routeNode(node("qa"), { refactorOnly: true }).agent).toBe("qa");
+    expect(routeNode(node("backend"), { refactorOnly: true }).agent).toBe("skip");
+    expect(routeNode(node("frontend"), { refactorOnly: true }).agent).toBe("skip");
   });
 });

@@ -671,7 +671,8 @@ export class Orchestrator {
         event: "node.enqueued",
         data: { agentKind: node.kind, depsReady: node.dependsOn.length },
       });
-      const route = routeNode(node, opts);
+      const routeResult = routeNode(node, opts);
+      const route = routeResult.agent;
       if (route === "skip") {
         debugLog("orchestrator.node.skip", { dagId, runId, nodeId: node.id });
         await log.append({
