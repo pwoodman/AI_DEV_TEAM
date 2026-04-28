@@ -186,6 +186,14 @@ function isLiteEligible(goal: string): boolean {
   return !needsRich;
 }
 
+function isSingleFilePath(paths: string[]): string | null {
+  if (paths.length !== 1) return null;
+  const p = paths[0];
+  // Has a file extension but no trailing slash (not a directory)
+  if (/\.\w{1,6}$/.test(p) && !p.endsWith("/")) return p;
+  return null;
+}
+
 function inferFallbackKind(request: string): AgentKind {
   const text = request.toLowerCase();
   // Refactor/rename/migrate must be checked BEFORE frontend, because prompts
@@ -775,6 +783,10 @@ export class Orchestrator {
           ? [...effectiveContextPaths, ...testReadPaths]
           : effectiveContextPaths;
 
+        // Mention-path pre-filter: if allowedPaths is exactly one file, load only that file.
+        const singleFile = isSingleFilePath(effectiveContextPaths);
+        const finalReadPaths = singleFile ? [singleFile] : allReadPaths;
+
         // Smart context building: use extra budget when contextSlice has symbols.
         // Always load allReadPaths so downstream nodes see the workspace state
         // (e.g. router.ts must see audit.ts created by an upstream node); the
@@ -782,7 +794,7 @@ export class Orchestrator {
         const budgetOverride = hasSlice
           ? routeResult.contextBudget + SYMBOL_CONTEXT_BUDGET
           : routeResult.contextBudget;
-        const files = await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
+        const files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
