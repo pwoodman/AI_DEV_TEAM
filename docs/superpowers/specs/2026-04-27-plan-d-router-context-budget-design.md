@@ -8,15 +8,16 @@
 
 ## 1. Objective
 
-Replace the current 6-line `routeNode()` function (which returns only `AgentKind | "skip"`) with a richer `RouteResult` that carries a per-task context byte budget and an allowed-validator list. Implement three candidate options, measure each empirically against one representative bench fixture, and promote the winner to the permanent default.
+Replace the current 6-line `routeNode()` function (which returns only `AgentKind | "skip"`) with a richer `RouteResult` that carries a per-task context byte budget and an allowed-validator list. Implement three candidate options, measure each empirically against two bench fixtures, and promote the winner to the permanent default. Additionally add three always-on simple-task optimizations (architect bypass, mention-path context pre-filtering, validator short-circuit) that close the performance gap against vanilla Claude Code on small obvious tasks.
 
 ---
 
 ## 2. Success Criteria
 
-- `tokensIn + tokensOut` reduced vs baseline on `add-pagination-to-list-endpoint`
-- Task still passes (same correctness)
-- Wall time equal or lower
+- `tokensIn + tokensOut` reduced vs baseline on both `add-pagination-to-list-endpoint` (medium) and `fix-failing-vitest` (micro)
+- Both tasks still pass (same correctness)
+- Wall time equal or lower on both fixtures
+- Architect bypass fires on `fix-failing-vitest` (detectable by absence of architect LLM call in decision log)
 - No regressions in the full 250-test suite
 
 ---
@@ -109,38 +110,90 @@ This option tests whether a tighter budget materially reduces `tokensIn` vs Opti
 
 ---
 
-## 7. Feature Flag
+## 7. Simple-Task Optimizations
 
-All three options plus the baseline are toggled via:
+Three additional optimizations applied on top of whichever router option wins the comparison. Each targets the overhead gap between AMASE and vanilla Claude Code on small, obvious tasks.
+
+### 7.1 Architect Bypass (fast path)
+
+**Problem:** even a trivially single-file task pays for a full architect LLM call to produce a DAG before any real work starts.
+
+**Detection heuristic** (pure string analysis, no LLM, applied in `plan()`):
+- Request mentions exactly one file path (regex: `\b\S+\.\w{1,5}\b`)
+- Request contains no coordination words: `across`, `all files`, `everywhere`, `refactor`, `migrate`, `rename throughout`
+- Request length < 300 characters
+
+When all three conditions hold, `plan()` skips the architect call and pre-builds a single-node DAG directly:
+
+```ts
+{
+  nodes: [{
+    id: "n1",
+    kind: detectKind(request),   // frontend | backend | qa — pure regex
+    allowedPaths: [detectedPath],
+    dependsOn: [],
+  }]
+}
+```
+
+**Fallback:** if the resulting patch fails validation, the orchestrator retries with a full architect-planned DAG (existing path). The bypass saves one LLM call on success; on failure it costs one extra round-trip — acceptable since the heuristic is conservative.
+
+### 7.2 Mention-Path Context Pre-filtering
+
+**Problem:** `buildContextFiles()` crawls all `allowedPaths` even when the request explicitly names the file to edit, loading unrelated files and wasting context budget.
+
+**Rule:** if the request contains a file path that exists in the workspace, set `allowedPaths = [mentionedPath]` and skip all directory crawling. The context budget then covers only that file and any imports it explicitly references (one level deep, resolved statically from the file's `import`/`require` statements).
+
+Applied in the orchestrator before `buildContextFiles()` — no change to `routeNode()` or `ContextAssembler`.
+
+### 7.3 Validator Short-Circuit for Micro Tasks
+
+**Problem:** `lang-adapter` runs lint + typecheck + tests even for patches that only touch test files or single isolated functions where type errors are structurally impossible.
+
+**Rule:** when `node.kind` is `"qa"` and the patch touches only `*.test.ts` / `*.spec.ts` files, drop `lang-adapter` from `allowedValidators` and run only `["schema", "patch-safety"]`. Test files cannot introduce type errors in production code; the test runner already validates correctness.
+
+This is additive to the `allowedValidators` logic in Section 4 — applied as a post-processing step on the `RouteResult` before the validator chain runs.
+
+---
+
+## 8. Feature Flag
+
+All three router options plus the baseline are toggled via:
 
 ```
 AMASE_ROUTER_MODE=baseline|option-a|option-b|option-c
 ```
 
-Default (when unset): `baseline` — no behaviour change until the comparison is run and the winner is promoted.
+The simple-task optimizations (Section 7) are always active alongside whichever router mode is selected — they are not behind a flag. Default (when unset): `baseline`.
 
 ---
 
-## 8. Comparison Script
+## 9. Comparison Script
 
-`scripts/router-comparison.mjs` runs all four modes sequentially against `add-pagination-to-list-endpoint` and prints a result table:
+`scripts/router-comparison.mjs` runs all four modes sequentially against two fixtures:
+- `add-pagination-to-list-endpoint` (medium — tests router budget impact)
+- `fix-failing-vitest` (micro — tests simple-task optimization impact)
 
 ```
-mode              tokensIn  tokensOut  wallMs  pass
-─────────────────────────────────────────────────────
-baseline          —         —          —       —
-option-a          —         —          —       —
-option-b          —         —          —       —
-option-c          —         —          —       —
+mode              fixture                          tokensIn  tokensOut  wallMs  pass
+──────────────────────────────────────────────────────────────────────────────────────
+baseline          add-pagination-to-list-endpoint  —         —          —       —
+baseline          fix-failing-vitest               —         —          —       —
+option-a          add-pagination-to-list-endpoint  —         —          —       —
+option-a          fix-failing-vitest               —         —          —       —
+option-b          add-pagination-to-list-endpoint  —         —          —       —
+option-b          fix-failing-vitest               —         —          —       —
+option-c          add-pagination-to-list-endpoint  —         —          —       —
+option-c          fix-failing-vitest               —         —          —       —
 ```
 
-Each mode calls `runAmase(fixture, opts)` directly (no subprocess). Metrics are read from the returned `BenchResult`. One run per mode — this is directional, not statistically significant.
+Each mode calls `runAmase(fixture, opts)` directly. One run per cell — directional, not statistically significant.
 
-**Winner:** lowest `tokensIn + tokensOut` that still passes.
+**Winner:** lowest `tokensIn + tokensOut` summed across both fixtures that still passes both.
 
 ---
 
-## 9. Winner Promotion
+## 10. Winner Promotion
 
 After running the comparison:
 
@@ -152,23 +205,25 @@ After running the comparison:
 
 ---
 
-## 10. Files Changed
+## 11. Files Changed
 
 | Action | File | Purpose |
 |--------|------|---------|
-| Modify | `packages/core/src/router.ts` | Return `RouteResult`; implement all 3 options behind flag |
+| Modify | `packages/core/src/router.ts` | Add `RouteResult` type; implement all 3 options + validator short-circuit (§7.3) |
 | Create | `packages/core/src/context-assembler.ts` | Extracted `ContextAssembler` class (Option B) |
-| Modify | `packages/core/src/orchestrator.ts` | Wire `contextBudget` + `allowedValidators` from `RouteResult` |
-| Modify | `packages/core/src/router.ts` | Add `RouteResult` type + `RouterOptions` stays; no contracts change needed |
-| Create | `packages/core/tests/router-route-result.test.ts` | Unit tests for all three `RouteResult` options |
+| Modify | `packages/core/src/orchestrator.ts` | Wire `contextBudget` + `allowedValidators`; add architect bypass (§7.1) + mention-path pre-filter (§7.2) |
+| Create | `packages/core/tests/router-route-result.test.ts` | Unit tests for all three `RouteResult` options + short-circuit rule |
 | Create | `packages/core/tests/context-assembler.test.ts` | Unit tests for `ContextAssembler` (Option B) |
+| Create | `packages/core/tests/architect-bypass.test.ts` | Unit tests for bypass heuristic (all three detection conditions) |
 | Create | `scripts/router-comparison.mjs` | Comparison runner — deleted after winner is promoted |
 
 ---
 
-## 11. Testing
+## 12. Testing
 
 - **Unit tests** for `routeNode()` covering every `AgentKind` × all three modes: assert correct `contextBudget` and `allowedValidators`.
 - **Unit tests** for `ContextAssembler.build()`: assert byte cap is respected, files are packed correctly.
+- **Unit tests** for architect bypass heuristic: test all boundary conditions (path present/absent, coordination words, length threshold).
+- **Unit tests** for validator short-circuit: `qa` node with test-only patch → `["schema", "patch-safety"]` only.
 - **Full suite** (`pnpm test`) must pass with each mode active before comparison is run.
-- **Comparison script** is the acceptance gate — winner must pass the fixture.
+- **Comparison script** is the acceptance gate — winner must pass both fixtures.
