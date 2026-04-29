@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { readdir, stat } from "node:fs/promises";
+import { readdir, stat, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 
 function debugLog(event: string, data: Record<string, unknown>): void {
@@ -14,6 +14,7 @@ import type {
   AgentInput,
   AgentKind,
   FeatureRequest,
+  ForwardRiskResult,
   Patch,
   TaskGraph,
   TaskNode,
@@ -167,6 +168,28 @@ function buildFallbackGraph(
       },
     ],
   };
+}
+
+// ---------------------------------------------------------------------------
+// Quality JSON writer
+// ---------------------------------------------------------------------------
+async function writeQualityJson(
+  workspace: string,
+  data: ForwardRiskResult & {
+    validatorFailures: number;
+    retries: number;
+    tokensUsed: number;
+  },
+): Promise<void> {
+  try {
+    await writeFile(
+      join(workspace, "quality.json"),
+      JSON.stringify(data, null, 2),
+      "utf8",
+    );
+  } catch {
+    // Non-critical — never block the main flow
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -840,6 +863,34 @@ export class Orchestrator {
         }
 
         if (outcome.ok) {
+          // Forward risk analysis — runs after all validators pass.
+          const { runForwardRiskAnalysis } = await import("@amase/validators");
+          const { adapterRegistry } = await import("@amase/validators");
+          const fwAdapter = adapterRegistry.getByLanguage(node.language ?? "") ?? null;
+          const riskResult = await runForwardRiskAnalysis(
+            output.patches,
+            paths.workspace,
+            node.language,
+            fwAdapter,
+          );
+
+          if (riskResult.regressionRisk === "HIGH" && retries < maxRetries) {
+            const issueText = riskResult.forwardRisks.length > 0
+              ? riskResult.forwardRisks.map((r) => `  - [${r.kind}] ${r.file}: ${r.detail}`).join("\n")
+              : "  (adapter tests failed)";
+            lastFailureMessage = `regression risk HIGH — tests failed after patch:\n${issueText}\nRevise the patch so all tests pass.`;
+            retries += 1;
+            continue;
+          }
+
+          // Write quality.json (best-effort, non-blocking)
+          await writeQualityJson(paths.workspace, {
+            ...riskResult,
+            validatorFailures: 0,
+            retries,
+            tokensUsed: 0,
+          });
+
           // Record patch quality for memory
           const pass = outcome.ok;
           const diffSim = 0; // computed in bench adapter, record here if available
