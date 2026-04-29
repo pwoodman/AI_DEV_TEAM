@@ -1,8 +1,8 @@
 # AMASE North Star PRD — Deterministic MCP Layer for High-Performance AI Coding
 
 **Date:** 2026-04-26
+**Last updated:** 2026-04-29
 **Status:** Approved — active north star
-**Supersedes:** nothing (supplements v1/v2 design docs as the goal state)
 
 ---
 
@@ -45,7 +45,7 @@ Language-agnostic by design. Expert-level support for the top 20 languages as of
 
 TypeScript, JavaScript, Python, Go, Rust, Java, C#, C++, C, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, SQL, HTML/CSS, R, Lua.
 
-Each language is supported via a **LangAdapter** (see Section 6). TypeScript is the reference implementation (already exists via tsc + biome + vitest). Languages without a registered adapter degrade gracefully to schema + patch-safety validators only.
+Each language is supported via a **LangAdapter** (see Section 6). TypeScript is the reference implementation (tsc + biome + vitest). Python (ruff + mypy + pytest) and Go (golangci-lint + go build + gofmt + go test) are implemented. Languages without a registered adapter degrade gracefully to schema + patch-safety validators only.
 
 ## 5. Architecture
 
@@ -54,38 +54,49 @@ Each language is supported via a **LangAdapter** (see Section 6). TypeScript is 
 ```
 Request
   ↓
-Language Detector        — deterministic, extension + shebang check
+Language Detector        — deterministic, extension + shebang check        ✅ done
   ↓
-Task Router              — pure function, selects agent + LangAdapter + context budget
+Task Router              — pure function, agent + context budget + validators ✅ done
   ↓
-Active Memory Injector   — pre-fetches ≤3 prior patterns from LanceDB (≤150 tokens)
+Active Memory Injector   — pre-fetches ≤3 prior patterns from LanceDB       🔲 todo
   ↓
-Context Assembler        — file slices + schemas + memory, capped at contextBudget
+Context Assembler        — file slices + schemas + memory, capped at budget  ✅ done
   ↓
 Agent (LLM)              — plans only, emits patches
   ↓
-Validator Chain          — delegates to LangAdapter: lint → typecheck → test → format
+Validator Chain          — delegates to LangAdapter: lint → typecheck → test  ✅ done
   ↓
-Forward Risk Analyser    — dependency graph scan, regression check, API/schema change detection
+Forward Risk Analyser    — dependency graph scan, regression check            🔲 todo
   ↓
-Delta Generator          — structured patch + quality metadata output
+Delta Generator          — structured patch + quality metadata output         🔲 todo
 ```
 
-### What Exists vs What's New
+### Component Status
 
 | Component | Status |
 |---|---|
-| MCP Server (plan/execute/status/artifacts) | Exists — keep |
-| Orchestrator / DAG Scheduler | Exists — keep |
-| Validator Chain (schema → patch-safety → tsc → biome → vitest) | Exists — extend |
-| Memory (ASTIndex, LanceDB, DecisionLog) | Exists — extend write path |
-| Router (kind → agent) | Exists — enhance with language awareness |
-| Language Detector | New |
-| LangAdapter interface + Registry | New |
-| 19 additional LangAdapters (TS already done) | New |
-| Active Memory Injector | New |
-| Forward Risk Analyser | New |
-| Context budget enforcement | New |
+| MCP Server (plan/execute/status/artifacts) | ✅ exists |
+| Orchestrator / DAG Scheduler | ✅ exists |
+| Validator Chain (schema → patch-safety → lang-adapter → security → ui-tests) | ✅ done |
+| Memory (ASTIndex, LanceDB, DecisionLog) | ✅ exists — LanceDB + embeddings infra ready |
+| Language Detector | ✅ done (Plan A) |
+| LangAdapter interface + Registry | ✅ done (Plan A) |
+| TypeScript adapter (tsc + biome + vitest) | ✅ done (Plan A) |
+| Python adapter (ruff + mypy + pytest) | ✅ done (Plan B) |
+| Go adapter (golangci-lint + go build + gofmt + go test) | ✅ done (Plan B) |
+| langAdapterValidator (language-aware dispatch) | ✅ done (Plan B) |
+| Router with RouteResult (contextBudget + allowedValidators) | ✅ done (Plan D) |
+| Mention-path context pre-filter | ✅ done (Plan D) |
+| Validator short-circuit by task kind | ✅ done (Plan D) |
+| Decision-log v2 events (run.started, node.enqueued, agent.llm.response) | ✅ done (Plan C) |
+| Gap metrics (parallelism, retry rate, cache-hit ratio, validator share) | ✅ done (Plan C) |
+| `amase-bench trace` CLI command | ✅ done (Plan C) |
+| Hard bench fixtures (fix-cascading-type-errors, split-god-module) | ✅ done (Plan C) |
+| `adapter: LangAdapter \| null` in RouteResult | 🔲 todo (Plan E) |
+| Active Memory Injector | 🔲 todo (Plan E) |
+| Forward Risk Analyser | 🔲 todo (Plan F) |
+| 17 additional LangAdapters (Rust, Java, C#, C++, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, HTML/CSS, SQL, R, Lua + 2 more) | 🔲 todo (Plan G+) |
+| Structured delta output format | 🔲 todo (Plan F) |
 
 ## 6. Language Adapter Layer
 
@@ -103,30 +114,28 @@ interface LangAdapter {
 }
 ```
 
-Each method spawns the appropriate CLI tool and maps output to the existing `ValidationResult` contract. No new validator chain logic required.
+### Language → Tool Mapping
 
-### Language → Tool Mapping (reference)
-
-| Language | Lint | Typecheck | Format | Test |
-|---|---|---|---|---|
-| TypeScript/JS | biome | tsc | biome | vitest |
-| Python | ruff | mypy | ruff | pytest |
-| Go | golangci-lint | go build | gofmt | go test |
-| Rust | clippy | rustc | rustfmt | cargo test |
-| Java | checkstyle | javac | google-java-format | junit |
-| C# | roslyn analyzers | dotnet build | dotnet format | dotnet test |
-| C/C++ | clang-tidy | clang | clang-format | ctest |
-| PHP | phpstan | — | php-cs-fixer | phpunit |
-| Ruby | rubocop | sorbet (optional) | rubocop | rspec |
-| Swift | swiftlint | swiftc | swiftformat | xctest |
-| Kotlin | detekt | kotlinc | ktlint | junit |
-| Dart | dart analyze | dart analyze | dart format | dart test |
-| Scala | scalafmt | scalac | scalafmt | sbt test |
-| Shell | shellcheck | — | shfmt | bats |
-| HTML/CSS | stylelint | — | prettier | — |
-| SQL | sqlfluff | — | sqlfluff | — |
-| R | lintr | — | styler | testthat |
-| Lua | luacheck | — | stylua | busted |
+| Language | Lint | Typecheck | Format | Test | Status |
+|---|---|---|---|---|---|
+| TypeScript/JS | biome | tsc | biome | vitest | ✅ done |
+| Python | ruff | mypy | ruff | pytest | ✅ done |
+| Go | golangci-lint | go build | gofmt | go test | ✅ done |
+| Rust | clippy | rustc | rustfmt | cargo test | 🔲 |
+| Java | checkstyle | javac | google-java-format | junit | 🔲 |
+| C# | roslyn analyzers | dotnet build | dotnet format | dotnet test | 🔲 |
+| C/C++ | clang-tidy | clang | clang-format | ctest | 🔲 |
+| PHP | phpstan | — | php-cs-fixer | phpunit | 🔲 |
+| Ruby | rubocop | sorbet (optional) | rubocop | rspec | 🔲 |
+| Swift | swiftlint | swiftc | swiftformat | xctest | 🔲 |
+| Kotlin | detekt | kotlinc | ktlint | junit | 🔲 |
+| Dart | dart analyze | dart analyze | dart format | dart test | 🔲 |
+| Scala | scalafmt | scalac | scalafmt | sbt test | 🔲 |
+| Shell | shellcheck | — | shfmt | bats | 🔲 |
+| HTML/CSS | stylelint | — | prettier | — | 🔲 |
+| SQL | sqlfluff | — | sqlfluff | — | 🔲 |
+| R | lintr | — | styler | testthat | 🔲 |
+| Lua | luacheck | — | stylua | busted | 🔲 |
 
 ### Registry
 
@@ -138,6 +147,8 @@ const adapterRegistry = new Map<string, LangAdapter>()
 Language Detector reads file extensions in the workspace → returns `LangAdapter[]`. If no adapter found, proceeds with schema + patch-safety only.
 
 ## 7. Active Memory Injector
+
+**Status: 🔲 todo — LanceDB + embeddings infra exists; injector not wired**
 
 Runs at context assembly time, before any LLM call.
 
@@ -166,22 +177,33 @@ interface MemoryInjection {
 
 ## 8. Enhanced Task Router
 
-Extends the existing pure-function router with language and budget awareness.
+**Status: ✅ done — contextBudget + allowedValidators wired. `adapter` field pending.**
+
+Current `RouteResult`:
 
 ```ts
 interface RouteResult {
-  agent: AgentKind
-  adapter: LangAdapter | null         // null = no adapter registered
-  allowedValidators: ValidatorKind[]  // only validators relevant to this task
-  contextBudget: number               // max tokens for context envelope
+  agent: AgentKind | "skip"
+  contextBudget: number               // max bytes for context envelope — ✅
+  allowedValidators: ValidatorName[]  // pruned to task kind — ✅
+  // adapter: LangAdapter | null      // 🔲 todo — needed for Plan E memory injection
 }
 ```
 
-- `allowedValidators` is the intersection of task kind and adapter capabilities. Irrelevant validator tool descriptions never reach the agent prompt.
-- `contextBudget` is passed to the context assembler, which fills file slices + schemas + memory injection up to the cap and stops.
-- Language detection is deterministic (extension + optional shebang/magic-byte). Zero tokens spent on routing.
+Target `RouteResult` (Plan E):
+
+```ts
+interface RouteResult {
+  agent: AgentKind | "skip"
+  adapter: LangAdapter | null         // null = no adapter registered
+  allowedValidators: ValidatorName[]
+  contextBudget: number
+}
+```
 
 ## 9. Quality Gate — Forward Risk Analyser
+
+**Status: 🔲 todo (Plan F)**
 
 Final stage of the validator chain, runs after all existing validators pass.
 
@@ -204,6 +226,8 @@ Pure AST + static analysis, no LLM:
 Each finding tagged and included in delta output.
 
 ## 10. Delta Output Format
+
+**Status: 🔲 todo (Plan F)**
 
 ```yaml
 patch:
@@ -232,8 +256,22 @@ tokens_used: 812
 - Run AMASE against existing bench fixtures continuously.
 - Track per-run: tokens used, wall-clock time, one-shot success, coverage, static analysis, regression detection rate.
 - Ship when all six success metrics in Section 2 are beaten simultaneously.
+- Bench infra: `amase-bench trace`, gap metrics, decision-log v2, hard fixtures all in place. ✅
 
-## 12. Enforcement Rules (Hard Constraints)
+## 12. Roadmap
+
+| Plan | Goal | Status |
+|---|---|---|
+| A | LangAdapter foundation (interface, registry, TS adapter) | ✅ merged |
+| B | Python + Go adapters, langAdapterValidator | ✅ merged |
+| C | Observability: decision-log v2, trace CLI, gap metrics, hard fixtures | ✅ merged |
+| D | Router: RouteResult, contextBudget, allowedValidators, mention-path filter | ✅ merged |
+| E | Active Memory Injector + `adapter` field in RouteResult | 🔲 next |
+| F | Forward Risk Analyser + structured delta output | 🔲 |
+| G | Rust, Java, C# LangAdapters | 🔲 |
+| H | Remaining 14 LangAdapters | 🔲 |
+
+## 13. Enforcement Rules (Hard Constraints)
 
 The system must not:
 
@@ -245,7 +283,7 @@ The system must not:
 - Make an LLM call without a Zod-validated input and scoped context envelope
 - Include tool descriptions for validators not in `allowedValidators`
 
-## 13. Definition of Senior-Level Code
+## 14. Definition of Senior-Level Code
 
 Code must be:
 

@@ -1,6 +1,6 @@
 # Plan D: Enhanced Task Router + Context Budget Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace `routeNode()`'s `AgentKind | "skip"` return with a `RouteResult` carrying per-task `contextBudget` and `allowedValidators`; implement three empirical options behind `AMASE_ROUTER_MODE`; add mention-path context pre-filter; run a two-fixture comparison; promote the winner.
 
@@ -31,7 +31,7 @@
 - Modify: `packages/core/src/router.ts`
 - Create: `packages/core/tests/router-route-result.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `packages/core/tests/router-route-result.test.ts`:
 
@@ -148,7 +148,7 @@ test("option-c: refactor gets 7200 bytes (1800 tokens × 4)", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd packages/core && pnpm exec vitest run tests/router-route-result.test.ts 2>&1 | tail -15
@@ -156,7 +156,7 @@ cd packages/core && pnpm exec vitest run tests/router-route-result.test.ts 2>&1 
 
 Expected: FAIL — `routeNode` returns `AgentKind | "skip"`, not a `RouteResult`.
 
-- [ ] **Step 3: Rewrite `packages/core/src/router.ts`**
+- [x] **Step 3: Rewrite `packages/core/src/router.ts`**
 
 Replace the entire file:
 
@@ -257,7 +257,7 @@ export function routeNode(node: TaskNode, opts: RouterOptions = {}): RouteResult
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd packages/core && pnpm exec vitest run tests/router-route-result.test.ts 2>&1 | tail -10
@@ -265,7 +265,7 @@ cd packages/core && pnpm exec vitest run tests/router-route-result.test.ts 2>&1 
 
 Expected: all tests PASS. (Note: ESM re-import caching may cause some env-switch tests to share the same module instance — if tests relying on `require()` fail due to ESM, refactor those tests to read the mode via a helper parameter instead of the env var directly. The `validatorsForNode` logic is what matters — test it in isolation if needed.)
 
-- [ ] **Step 5: Build core**
+- [x] **Step 5: Build core**
 
 ```bash
 cd packages/core && pnpm build 2>&1 | tail -5
@@ -273,7 +273,7 @@ cd packages/core && pnpm build 2>&1 | tail -5
 
 Expected: clean build.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core/src/router.ts packages/core/tests/router-route-result.test.ts
@@ -289,7 +289,7 @@ git commit -m "feat(core): add RouteResult type; implement router options A/B/C 
 
 The orchestrator currently calls `routeNode()` and treats the result as `AgentKind | "skip"`. Every use of `route` as an agent kind must become `routeResult.agent`. The context budget and allowed validators must be wired in.
 
-- [ ] **Step 1: Find all uses of `route` in `execute()` — confirm the lines to change**
+- [x] **Step 1: Find all uses of `route` in `execute()` — confirm the lines to change**
 
 ```bash
 grep -n "\broute\b" packages/core/src/orchestrator.ts | grep -v "//\|router\|routeN\|routeP\|routeR\|route =\|route:\|route," | head -30
@@ -303,7 +303,7 @@ Expected output includes lines like:
 - `ctx.touchesFrontend: route === "frontend" || route === "ui-test"`
 - `recordPatchQuality(route, node.language, ...)`
 
-- [ ] **Step 2: Replace `routeNode()` call and update all downstream uses**
+- [x] **Step 2: Replace `routeNode()` call and update all downstream uses**
 
 In `packages/core/src/orchestrator.ts`, find the block starting with:
 
@@ -386,7 +386,7 @@ Then replace every subsequent use of `route` (as the agent) within the `execute`
           recordPatchQuality(routeResult.agent, node.language, pass, diffSim);
 ```
 
-- [ ] **Step 3: Wire `contextBudget` into `buildContextFiles()`**
+- [x] **Step 3: Wire `contextBudget` into `buildContextFiles()`**
 
 Find the line:
 
@@ -404,7 +404,7 @@ Replace with:
         const files = await buildContextFiles(paths.workspace, allReadPaths, budgetOverride);
 ```
 
-- [ ] **Step 4: Wire `allowedValidators` into the validator chain**
+- [x] **Step 4: Wire `allowedValidators` into the validator chain**
 
 Find the block:
 
@@ -439,7 +439,7 @@ import type { AgentInput, AgentKind, DAG, ... } from "@amase/contracts";
 import type { AgentInput, AgentKind, DAG, ..., ValidatorName } from "@amase/contracts";
 ```
 
-- [ ] **Step 5: Build and run full test suite**
+- [x] **Step 5: Build and run full test suite**
 
 ```bash
 cd packages/core && pnpm build 2>&1 | tail -5
@@ -448,7 +448,7 @@ cd .. && pnpm test 2>&1 | tail -10
 
 Expected: clean build, all 250 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/core/src/orchestrator.ts
@@ -464,7 +464,7 @@ git commit -m "feat(core): wire RouteResult.contextBudget and allowedValidators 
 
 When a node's `allowedPaths` contains exactly one entry that looks like a file (has an extension), skip all directory crawling and load only that file. This saves 500–3000 context bytes on micro tasks where the scope is unambiguous.
 
-- [ ] **Step 1: Add `isSingleFilePath` helper near `isLiteEligible`**
+- [x] **Step 1: Add `isSingleFilePath` helper near `isLiteEligible`**
 
 In `packages/core/src/orchestrator.ts`, after the `isLiteEligible` function (around line 188), add:
 
@@ -478,7 +478,7 @@ function isSingleFilePath(paths: string[]): string | null {
 }
 ```
 
-- [ ] **Step 2: Apply pre-filter in `execute()` before `buildContextFiles()`**
+- [x] **Step 2: Apply pre-filter in `execute()` before `buildContextFiles()`**
 
 Find the context-building block (the one that computes `allReadPaths`) and locate just before the `buildContextFiles` call. Add the pre-filter:
 
@@ -496,7 +496,7 @@ Find the context-building block (the one that computes `allReadPaths`) and locat
 
 (Replace the existing `buildContextFiles` call line — `finalReadPaths` replaces `allReadPaths`.)
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 ```bash
 pnpm test 2>&1 | tail -10
@@ -504,7 +504,7 @@ pnpm test 2>&1 | tail -10
 
 Expected: all 250 tests pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/core/src/orchestrator.ts
@@ -521,7 +521,7 @@ git commit -m "feat(core): add mention-path context pre-filter for single-file n
 
 Option B extracts `buildContextFiles()` into a class to confirm the extraction is safe (identical behaviour) and to prepare the slot for Plan E's memory injection.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `packages/core/tests/context-assembler.test.ts`:
 
@@ -596,7 +596,7 @@ test("build() returns path and slice for each file", async () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 ```bash
 cd packages/core && pnpm exec vitest run tests/context-assembler.test.ts 2>&1 | tail -10
@@ -604,7 +604,7 @@ cd packages/core && pnpm exec vitest run tests/context-assembler.test.ts 2>&1 | 
 
 Expected: FAIL — `ContextAssembler` not found.
 
-- [ ] **Step 3: Create `packages/core/src/context-assembler.ts`**
+- [x] **Step 3: Create `packages/core/src/context-assembler.ts`**
 
 ```typescript
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -671,7 +671,7 @@ export class ContextAssembler {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd packages/core && pnpm exec vitest run tests/context-assembler.test.ts 2>&1 | tail -10
@@ -679,7 +679,7 @@ cd packages/core && pnpm exec vitest run tests/context-assembler.test.ts 2>&1 | 
 
 Expected: 4 PASS.
 
-- [ ] **Step 5: Wire `ContextAssembler` into orchestrator for `option-b` mode**
+- [x] **Step 5: Wire `ContextAssembler` into orchestrator for `option-b` mode**
 
 In `packages/core/src/orchestrator.ts`, add the import at the top:
 
@@ -699,7 +699,7 @@ Then in the execute() function, locate the `buildContextFiles` call (which you'v
         }
 ```
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 ```bash
 pnpm test 2>&1 | tail -10
@@ -707,7 +707,7 @@ pnpm test 2>&1 | tail -10
 
 Expected: all tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add packages/core/src/context-assembler.ts packages/core/tests/context-assembler.test.ts packages/core/src/orchestrator.ts
@@ -721,7 +721,7 @@ git commit -m "feat(core): add ContextAssembler class; wire as option-b context 
 **Files:**
 - Create: `scripts/router-comparison.mjs`
 
-- [ ] **Step 1: Build all packages so the bench adapter and fixtures are importable**
+- [x] **Step 1: Build all packages so the bench adapter and fixtures are importable**
 
 ```bash
 pnpm build 2>&1 | tail -5
@@ -729,7 +729,7 @@ pnpm build 2>&1 | tail -5
 
 Expected: clean build.
 
-- [ ] **Step 2: Create `scripts/router-comparison.mjs`**
+- [x] **Step 2: Create `scripts/router-comparison.mjs`**
 
 ```javascript
 #!/usr/bin/env node
@@ -826,7 +826,7 @@ console.log(`\n🏆 Winner: ${winner} (${totals[winner].tokens} total tokens)`);
 console.log(`   → Promote by setting AMASE_ROUTER_MODE default to "${winner}" and removing the flag.`);
 ```
 
-- [ ] **Step 3: Run the comparison script**
+- [x] **Step 3: Run the comparison script**
 
 ```bash
 node scripts/router-comparison.mjs 2>&1
@@ -836,7 +836,7 @@ Expected: table prints with all 8 rows (4 modes × 2 fixtures), winner announced
 
 Record the winner from the output before proceeding.
 
-- [ ] **Step 4: Commit the script**
+- [x] **Step 4: Commit the script**
 
 ```bash
 git add scripts/router-comparison.mjs
@@ -854,7 +854,7 @@ git commit -m "feat(bench): add router-comparison.mjs — two-fixture A/B/C/base
 
 Run this task only after Task 5 has completed and you have the winner name (e.g. `option-a`).
 
-- [ ] **Step 1: Set winner as unconditional default in `router.ts`**
+- [x] **Step 1: Set winner as unconditional default in `router.ts`**
 
 In `packages/core/src/router.ts`, remove the `AMASE_ROUTER_MODE` env check. Replace the entire mode-switch block with the winning option's logic directly. For example, if `option-a` wins:
 
@@ -885,7 +885,7 @@ export function routeNode(node: TaskNode, opts: RouterOptions = {}): RouteResult
 
 Remove unused lookup tables (the ones belonging to losing options).
 
-- [ ] **Step 2: Remove `AMASE_ROUTER_MODE` check from orchestrator for option-b branch**
+- [x] **Step 2: Remove `AMASE_ROUTER_MODE` check from orchestrator for option-b branch**
 
 In `packages/core/src/orchestrator.ts`, if option-b was NOT the winner, remove:
 
@@ -904,13 +904,13 @@ And replace with either:
 
 If option-b was NOT the winner, also delete `packages/core/src/context-assembler.ts` and its test.
 
-- [ ] **Step 3: Delete comparison script**
+- [x] **Step 3: Delete comparison script**
 
 ```bash
 rm scripts/router-comparison.mjs
 ```
 
-- [ ] **Step 4: Run full test suite**
+- [x] **Step 4: Run full test suite**
 
 ```bash
 pnpm test 2>&1 | tail -10
@@ -918,7 +918,7 @@ pnpm test 2>&1 | tail -10
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A

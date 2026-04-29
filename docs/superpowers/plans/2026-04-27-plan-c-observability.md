@@ -1,6 +1,6 @@
 # Phase C — Flow Routing & Observability Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add structured decision-log v2 events to the orchestrator, a `amase-bench trace` CLI command that renders a waterfall + token table + gap metrics, and two hard bench fixtures designed to expose single-context agent failure modes.
 
@@ -34,7 +34,7 @@
 - Modify: `packages/contracts/src/validation.ts`
 - Test: `packages/contracts/tests/decision-log-v2.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `packages/contracts/tests/decision-log-v2.test.ts`:
 
@@ -103,14 +103,14 @@ test("old events still parse", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 cd packages/contracts && pnpm exec vitest run tests/decision-log-v2.test.ts
 ```
 Expected: FAIL — `"run.started"` is not in the enum.
 
-- [ ] **Step 3: Add new event types to `packages/contracts/src/validation.ts`**
+- [x] **Step 3: Add new event types to `packages/contracts/src/validation.ts`**
 
 Replace the `event` enum in `DecisionLogEntrySchema`:
 
@@ -152,21 +152,21 @@ event: z.enum([
 ]),
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd packages/contracts && pnpm exec vitest run tests/decision-log-v2.test.ts
 ```
 Expected: 5 PASS.
 
-- [ ] **Step 5: Build contracts and run full contracts test suite**
+- [x] **Step 5: Build contracts and run full contracts test suite**
 
 ```bash
 cd packages/contracts && pnpm build && pnpm exec vitest run
 ```
 Expected: all existing tests still pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/contracts/src/validation.ts packages/contracts/tests/decision-log-v2.test.ts
@@ -180,7 +180,7 @@ git commit -m "feat(contracts): add v2 decision-log event types (run.started, no
 **Files:**
 - Modify: `packages/core/src/orchestrator.ts`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `packages/core/tests/orchestrator-events.test.ts`:
 
@@ -247,14 +247,14 @@ test("execute emits run.started and run.completed", async () => {
 }, 30_000);
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 ```bash
 cd packages/core && pnpm exec vitest run tests/orchestrator-events.test.ts
 ```
 Expected: FAIL — `run.started` not in emitted events.
 
-- [ ] **Step 3: Emit `run.started` at beginning of `execute()` in `packages/core/src/orchestrator.ts`**
+- [x] **Step 3: Emit `run.started` at beginning of `execute()` in `packages/core/src/orchestrator.ts`**
 
 After `const log = this.deps.makeDecisionLog(paths.decisions);` (around line 639), add:
 
@@ -269,7 +269,7 @@ await log.append({
 });
 ```
 
-- [ ] **Step 4: Emit `node.enqueued` in the scheduler callback**
+- [x] **Step 4: Emit `node.enqueued` in the scheduler callback**
 
 In the `execute` async function closure (line 644), at the very start of the closure body, before the `routeNode` call:
 
@@ -284,7 +284,7 @@ await log.append({
 });
 ```
 
-- [ ] **Step 5: Emit `agent.llm.response` after the `llm.call` append**
+- [x] **Step 5: Emit `agent.llm.response` after the `llm.call` append**
 
 After the existing `llm.call` log.append block (around line 799), add:
 
@@ -305,7 +305,7 @@ await log.append({
 });
 ```
 
-- [ ] **Step 6: Emit `run.completed` at the end of `execute()`, before `return { runId }`**
+- [x] **Step 6: Emit `run.completed` at the end of `execute()`, before `return { runId }`**
 
 After the deployment readiness block, before `return { runId }`:
 
@@ -326,21 +326,21 @@ await log.append({
 });
 ```
 
-- [ ] **Step 7: Build core, run test**
+- [x] **Step 7: Build core, run test**
 
 ```bash
 cd packages/core && pnpm build && pnpm exec vitest run tests/orchestrator-events.test.ts
 ```
 Expected: PASS.
 
-- [ ] **Step 8: Run full core test suite**
+- [x] **Step 8: Run full core test suite**
 
 ```bash
 cd packages/core && pnpm exec vitest run
 ```
 Expected: all existing tests pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/core/src/orchestrator.ts packages/core/tests/orchestrator-events.test.ts
@@ -355,7 +355,7 @@ git commit -m "feat(core): emit run.started, node.enqueued, agent.llm.response, 
 - Create: `packages/bench/src/gap-metrics.ts`
 - Test: `packages/bench/tests/gap-metrics.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `packages/bench/tests/gap-metrics.test.ts`:
 
@@ -469,14 +469,14 @@ test("flags.highRetryRate set when retryRate > 0.15", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 ```bash
 cd packages/bench && pnpm exec vitest run tests/gap-metrics.test.ts
 ```
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Create `packages/bench/src/gap-metrics.ts`**
+- [x] **Step 3: Create `packages/bench/src/gap-metrics.ts`**
 
 ```typescript
 import type { DecisionLogEntry } from "@amase/contracts";
@@ -580,14 +580,14 @@ export function computeGapMetrics(entries: DecisionLogEntry[]): GapMetrics {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd packages/bench && pnpm exec vitest run tests/gap-metrics.test.ts
 ```
 Expected: 8 PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/bench/src/gap-metrics.ts packages/bench/tests/gap-metrics.test.ts
@@ -602,7 +602,7 @@ git commit -m "feat(bench): add gap-metrics module (parallelism, retry rate, cac
 - Create: `packages/bench/src/trace.ts`
 - Test: `packages/bench/tests/trace.test.ts`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `packages/bench/tests/trace.test.ts`:
 
@@ -664,14 +664,14 @@ test("renderTrace empty entries returns short message", () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 ```bash
 cd packages/bench && pnpm exec vitest run tests/trace.test.ts
 ```
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Create `packages/bench/src/trace.ts`**
+- [x] **Step 3: Create `packages/bench/src/trace.ts`**
 
 ```typescript
 import type { DecisionLogEntry } from "@amase/contracts";
@@ -800,14 +800,14 @@ export function renderTrace(entries: DecisionLogEntry[]): string {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 cd packages/bench && pnpm exec vitest run tests/trace.test.ts
 ```
 Expected: 6 PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/bench/src/trace.ts packages/bench/tests/trace.test.ts
@@ -821,7 +821,7 @@ git commit -m "feat(bench): add trace renderer (waterfall, token table, retry ho
 **Files:**
 - Modify: `packages/bench/src/cli.ts`
 
-- [ ] **Step 1: Read `packages/bench/src/cli.ts` to understand current structure**
+- [x] **Step 1: Read `packages/bench/src/cli.ts` to understand current structure**
 
 Current `main()` dispatches on `cmd`:
 ```typescript
@@ -832,7 +832,7 @@ if (cmd !== "run") {
 }
 ```
 
-- [ ] **Step 2: Replace the dispatch block in `packages/bench/src/cli.ts`**
+- [x] **Step 2: Replace the dispatch block in `packages/bench/src/cli.ts`**
 
 Change the error-only dispatch to support both `run` and `trace`:
 
@@ -951,7 +951,7 @@ main().catch((e) => {
 });
 ```
 
-- [ ] **Step 3: Build and smoke-test the trace command**
+- [x] **Step 3: Build and smoke-test the trace command**
 
 ```bash
 cd packages/bench && pnpm build
@@ -963,14 +963,14 @@ node dist/cli.js trace /tmp/test-decisions.jsonl
 ```
 Expected: waterfall + token table + gap metrics printed to stdout.
 
-- [ ] **Step 4: Run full bench test suite**
+- [x] **Step 4: Run full bench test suite**
 
 ```bash
 cd packages/bench && pnpm exec vitest run
 ```
 Expected: all existing tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/bench/src/cli.ts
@@ -995,7 +995,7 @@ git commit -m "feat(bench): add 'amase-bench trace <decisions.jsonl>' subcommand
 - Create: `packages/bench/fixtures/fix-cascading-type-errors/before/src/api.ts`
 - Create: `packages/bench/fixtures/fix-cascading-type-errors/tests/users.test.ts`
 
-- [ ] **Step 1: Create meta.yaml**
+- [x] **Step 1: Create meta.yaml**
 
 ```yaml
 category: xl
@@ -1003,7 +1003,7 @@ language: ts
 summary: Fix cascading type errors from a UserId refactor (number→string) across 4 files plus a hidden runtime bug in the comparison logic.
 ```
 
-- [ ] **Step 2: Create prompt.md**
+- [x] **Step 2: Create prompt.md**
 
 ```markdown
 The `UserId` type in `src/types.ts` was recently changed from `number` to `string` (to support UUID-style IDs), but the change was not propagated. Four other files still treat `UserId` as a number, causing TypeScript errors and a hidden runtime bug.
@@ -1019,7 +1019,7 @@ Do NOT change the `UserId` type in `src/types.ts` — it is already correct as `
 Do NOT change the `Parser` interface or test file.
 ```
 
-- [ ] **Step 3: Create `before/package.json`**
+- [x] **Step 3: Create `before/package.json`**
 
 ```json
 {
@@ -1031,7 +1031,7 @@ Do NOT change the `Parser` interface or test file.
 }
 ```
 
-- [ ] **Step 4: Create `before/tsconfig.json`**
+- [x] **Step 4: Create `before/tsconfig.json`**
 
 ```json
 {
@@ -1045,7 +1045,7 @@ Do NOT change the `Parser` interface or test file.
 }
 ```
 
-- [ ] **Step 5: Create `before/src/types.ts`** (already correct — string)
+- [x] **Step 5: Create `before/src/types.ts`** (already correct — string)
 
 ```typescript
 export type UserId = string;
@@ -1063,7 +1063,7 @@ export interface Session {
 }
 ```
 
-- [ ] **Step 6: Create `before/src/user-store.ts`** (has bugs)
+- [x] **Step 6: Create `before/src/user-store.ts`** (has bugs)
 
 ```typescript
 import type { User, UserId } from "./types.js";
@@ -1091,7 +1091,7 @@ export function addUser(user: User): void {
 }
 ```
 
-- [ ] **Step 7: Create `before/src/session.ts`** (has type error)
+- [x] **Step 7: Create `before/src/session.ts`** (has type error)
 
 ```typescript
 import type { Session, UserId } from "./types.js";
@@ -1112,7 +1112,7 @@ export function isValidSession(session: Session): boolean {
 }
 ```
 
-- [ ] **Step 8: Create `before/src/auth.ts`** (has type error)
+- [x] **Step 8: Create `before/src/auth.ts`** (has type error)
 
 ```typescript
 import type { UserId } from "./types.js";
@@ -1131,7 +1131,7 @@ export function validateUserId(id: UserId): boolean {
 }
 ```
 
-- [ ] **Step 9: Create `before/src/api.ts`** (has type error)
+- [x] **Step 9: Create `before/src/api.ts`** (has type error)
 
 ```typescript
 import type { User, UserId } from "./types.js";
@@ -1159,7 +1159,7 @@ export function handleAddUser(req: ApiRequest): { ok: boolean } {
 }
 ```
 
-- [ ] **Step 10: Create `tests/users.test.ts`**
+- [x] **Step 10: Create `tests/users.test.ts`**
 
 ```typescript
 import { expect, test } from "vitest";
@@ -1230,14 +1230,14 @@ test("handleGetUser returns error for unknown id", () => {
 });
 ```
 
-- [ ] **Step 11: Verify the fixture fails with the before code**
+- [x] **Step 11: Verify the fixture fails with the before code**
 
 ```bash
 cd packages/bench/fixtures/fix-cascading-type-errors/before && pnpm install && pnpm exec vitest run
 ```
 Expected: multiple test failures (getUser returns undefined, session userId is 1 not "user-1", etc.)
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add packages/bench/fixtures/fix-cascading-type-errors/
@@ -1259,7 +1259,7 @@ git commit -m "feat(bench): add xl fixture fix-cascading-type-errors (hidden run
 - Create: `packages/bench/fixtures/split-god-module/before/src/app.ts`
 - Create: `packages/bench/fixtures/split-god-module/tests/modules.test.ts`
 
-- [ ] **Step 1: Create meta.yaml**
+- [x] **Step 1: Create meta.yaml**
 
 ```yaml
 category: xl
@@ -1267,7 +1267,7 @@ language: ts
 summary: Split a 280-line god module into 5 focused modules (parser, response, validator, permissions, rate-limiter) and update the app entry point.
 ```
 
-- [ ] **Step 2: Create prompt.md**
+- [x] **Step 2: Create prompt.md**
 
 ```markdown
 The file `src/god.ts` mixes five responsibilities that must be separated into focused modules.
@@ -1288,7 +1288,7 @@ Requirements:
 - The test file imports directly from each new module path, not from `src/god.ts`.
 ```
 
-- [ ] **Step 3: Create `before/package.json`**
+- [x] **Step 3: Create `before/package.json`**
 
 ```json
 {
@@ -1300,7 +1300,7 @@ Requirements:
 }
 ```
 
-- [ ] **Step 4: Create `before/tsconfig.json`**
+- [x] **Step 4: Create `before/tsconfig.json`**
 
 ```json
 {
@@ -1314,7 +1314,7 @@ Requirements:
 }
 ```
 
-- [ ] **Step 5: Create `before/src/god.ts`** (the large god module)
+- [x] **Step 5: Create `before/src/god.ts`** (the large god module)
 
 ```typescript
 // God module — everything mixed together. Split me into 5 focused modules.
@@ -1430,7 +1430,7 @@ export function checkRateLimit(userId: string): RateLimitResult {
 }
 ```
 
-- [ ] **Step 6: Create `before/src/app.ts`** (the entry point that needs updating)
+- [x] **Step 6: Create `before/src/app.ts`** (the entry point that needs updating)
 
 ```typescript
 import {
@@ -1464,7 +1464,7 @@ export function handleRequest(raw: string, userId?: string): string {
 }
 ```
 
-- [ ] **Step 7: Create `tests/modules.test.ts`**
+- [x] **Step 7: Create `tests/modules.test.ts`**
 
 ```typescript
 import { expect, test } from "vitest";
@@ -1560,7 +1560,7 @@ test("remaining decreases with each request", () => {
 });
 ```
 
-- [ ] **Step 8: Verify the fixture fails with the before code (imports from split modules don't exist yet)**
+- [x] **Step 8: Verify the fixture fails with the before code (imports from split modules don't exist yet)**
 
 ```bash
 cd packages/bench/fixtures/split-god-module/before && pnpm install
@@ -1568,7 +1568,7 @@ cd .. && pnpm exec vitest run tests/modules.test.ts 2>&1 | head -20
 ```
 Expected: Cannot find module `../src/parser.js` etc.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/bench/fixtures/split-god-module/
@@ -1582,13 +1582,13 @@ git commit -m "feat(bench): add xl fixture split-god-module (5-module split from
 **Files:**
 - Modify: `packages/bench/tests/fixture-meta.test.ts`
 
-- [ ] **Step 1: Read current test**
+- [x] **Step 1: Read current test**
 
 ```bash
 cat packages/bench/tests/fixture-meta.test.ts
 ```
 
-- [ ] **Step 2: Find the expected counts for large/xl categories and update**
+- [x] **Step 2: Find the expected counts for large/xl categories and update**
 
 The test currently expects `large: 5` (or similar). After adding 2 xl fixtures, update to include `xl: 2`. The test pattern usually looks like:
 
@@ -1598,21 +1598,21 @@ expect(counts.xl).toBe(2);
 
 Find the line asserting the large fixture count and add an xl assertion below it.
 
-- [ ] **Step 3: Run the test**
+- [x] **Step 3: Run the test**
 
 ```bash
 cd packages/bench && pnpm exec vitest run tests/fixture-meta.test.ts
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Run full bench test suite**
+- [x] **Step 4: Run full bench test suite**
 
 ```bash
 cd packages/bench && pnpm exec vitest run
 ```
 Expected: all tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/bench/tests/fixture-meta.test.ts

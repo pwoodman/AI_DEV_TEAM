@@ -1,6 +1,6 @@
 # Plan A: LangAdapter Foundation — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Establish the LangAdapter interface, registry, language detector, shared spawn utility, and TypeScript reference adapter — the foundation that Plans B, C, and D build on.
 
@@ -43,7 +43,7 @@
 - Modify: `packages/skills/tests/resolver.test.ts`
 - Modify: `packages/mcp-server/tests/tools-contract.test.ts`
 
-- [ ] **Step 1: Write the failing test for new language values**
+- [x] **Step 1: Write the failing test for new language values**
 
 Add to `packages/contracts/tests/schemas.test.ts` inside the existing `describe("AgentInput")` block:
 
@@ -60,7 +60,7 @@ it("rejects old short language codes", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 ```bash
 pnpm --filter @amase/contracts test
@@ -68,7 +68,7 @@ pnpm --filter @amase/contracts test
 
 Expected: FAIL — `"typescript"` not in enum, `"ts"` still accepted.
 
-- [ ] **Step 3: Update LanguageSchema in kinds.ts**
+- [x] **Step 3: Update LanguageSchema in kinds.ts**
 
 Replace the existing `LanguageSchema` and `Language` export in `packages/contracts/src/kinds.ts`:
 
@@ -114,7 +114,7 @@ export const LanguageSchema = z.enum([
 export type Language = z.infer<typeof LanguageSchema>;
 ```
 
-- [ ] **Step 4: Update skills registry to use full language names**
+- [x] **Step 4: Update skills registry to use full language names**
 
 In `packages/skills/src/registry.ts`, make these exact replacements:
 
@@ -155,18 +155,18 @@ skill("lang/sql", "Safe SQL authoring and migrations", { languages: ["sql"] }, s
 
 Run `pnpm --filter @amase/skills typecheck` after each change to catch any missed references.
 
-- [ ] **Step 5: Update skills resolver test**
+- [x] **Step 5: Update skills resolver test**
 
 In `packages/skills/tests/resolver.test.ts`, replace:
 - `language: "go"` → `language: "go"` (unchanged)
 - `language: "ts"` → `language: "typescript"`
 
-- [ ] **Step 6: Update MCP server test**
+- [x] **Step 6: Update MCP server test**
 
 In `packages/mcp-server/tests/tools-contract.test.ts`, replace:
 - `language: "ts"` → `language: "typescript"`
 
-- [ ] **Step 7: Run all tests to confirm passing**
+- [x] **Step 7: Run all tests to confirm passing**
 
 ```bash
 pnpm test
@@ -174,7 +174,7 @@ pnpm test
 
 Expected: all tests pass. Fix any remaining old short-code references reported by TypeScript errors.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add packages/contracts/src/kinds.ts packages/skills/src/registry.ts packages/skills/tests/resolver.test.ts packages/mcp-server/tests/tools-contract.test.ts packages/contracts/tests/schemas.test.ts
@@ -192,7 +192,7 @@ git commit -m "feat(contracts): expand LanguageSchema to full names for top-20 l
 - Modify: `packages/validators/src/unit-tests.ts`
 - Create: `packages/validators/tests/spawn-command.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `packages/validators/tests/spawn-command.test.ts`:
 
@@ -220,7 +220,7 @@ describe("spawnCommand", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -228,7 +228,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `spawn-command.js` not found.
 
-- [ ] **Step 3: Create spawnCommand**
+- [x] **Step 3: Create spawnCommand**
 
 Create `packages/validators/src/spawn-command.ts`:
 
@@ -255,7 +255,7 @@ export function spawnCommand(
 }
 ```
 
-- [ ] **Step 4: Run test to confirm it passes**
+- [x] **Step 4: Run test to confirm it passes**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -263,7 +263,7 @@ pnpm --filter @amase/validators test
 
 Expected: PASS for spawn-command tests.
 
-- [ ] **Step 5: Refactor lint.ts to use spawnCommand**
+- [x] **Step 5: Refactor lint.ts to use spawnCommand**
 
 Replace the contents of `packages/validators/src/lint.ts`:
 
@@ -298,7 +298,7 @@ export const lintValidator: Validator = {
 };
 ```
 
-- [ ] **Step 6: Refactor typecheck.ts to use spawnCommand**
+- [x] **Step 6: Refactor typecheck.ts to use spawnCommand**
 
 Replace the contents of `packages/validators/src/typecheck.ts`:
 
@@ -344,7 +344,7 @@ function parseTscOutput(text: string) {
 }
 ```
 
-- [ ] **Step 7: Refactor unit-tests.ts to use spawnCommand**
+- [x] **Step 7: Refactor unit-tests.ts to use spawnCommand**
 
 Replace the contents of `packages/validators/src/unit-tests.ts`:
 
@@ -375,7 +375,7 @@ export const unitTestsValidator: Validator = {
 };
 ```
 
-- [ ] **Step 8: Run all validator tests to confirm no regressions**
+- [x] **Step 8: Run all validator tests to confirm no regressions**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -383,7 +383,7 @@ pnpm --filter @amase/validators test
 
 Expected: all tests pass.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add packages/validators/src/spawn-command.ts packages/validators/src/lint.ts packages/validators/src/typecheck.ts packages/validators/src/unit-tests.ts packages/validators/tests/spawn-command.test.ts
@@ -397,7 +397,7 @@ git commit -m "refactor(validators): extract shared spawnCommand utility"
 **Files:**
 - Create: `packages/validators/src/lang-adapter.ts`
 
-- [ ] **Step 1: Create the interface file**
+- [x] **Step 1: Create the interface file**
 
 Create `packages/validators/src/lang-adapter.ts`:
 
@@ -414,7 +414,7 @@ export interface LangAdapter {
 }
 ```
 
-- [ ] **Step 2: Typecheck to confirm the interface compiles**
+- [x] **Step 2: Typecheck to confirm the interface compiles**
 
 ```bash
 pnpm --filter @amase/validators typecheck
@@ -422,7 +422,7 @@ pnpm --filter @amase/validators typecheck
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add packages/validators/src/lang-adapter.ts
@@ -437,7 +437,7 @@ git commit -m "feat(validators): add LangAdapter interface"
 - Create: `packages/validators/src/language-detector.ts`
 - Create: `packages/validators/tests/language-detector.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/language-detector.test.ts`:
 
@@ -510,7 +510,7 @@ describe("detectLanguages", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -518,7 +518,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `language-detector.js` not found.
 
-- [ ] **Step 3: Create the LanguageDetector**
+- [x] **Step 3: Create the LanguageDetector**
 
 Create `packages/validators/src/language-detector.ts`:
 
@@ -609,7 +609,7 @@ export async function detectLanguages(files: string[]): Promise<string[]> {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -617,7 +617,7 @@ pnpm --filter @amase/validators test
 
 Expected: all language-detector tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/language-detector.ts packages/validators/tests/language-detector.test.ts
@@ -632,7 +632,7 @@ git commit -m "feat(validators): add LanguageDetector — extension + shebang de
 - Create: `packages/validators/src/lang-adapter-registry.ts`
 - Create: `packages/validators/tests/lang-adapter-registry.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/lang-adapter-registry.test.ts`:
 
@@ -701,7 +701,7 @@ describe("LangAdapterRegistry", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -709,7 +709,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `lang-adapter-registry.js` not found.
 
-- [ ] **Step 3: Create the registry**
+- [x] **Step 3: Create the registry**
 
 Create `packages/validators/src/lang-adapter-registry.ts`:
 
@@ -752,7 +752,7 @@ export class LangAdapterRegistry {
 export const adapterRegistry = new LangAdapterRegistry();
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -760,7 +760,7 @@ pnpm --filter @amase/validators test
 
 Expected: all registry tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/lang-adapter-registry.ts packages/validators/tests/lang-adapter-registry.test.ts
@@ -775,7 +775,7 @@ git commit -m "feat(validators): add LangAdapterRegistry"
 - Create: `packages/validators/src/adapters/typescript.ts`
 - Create: `packages/validators/tests/adapters/typescript.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/adapters/typescript.test.ts`:
 
@@ -818,7 +818,7 @@ describe("typescriptAdapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -826,7 +826,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `adapters/typescript.js` not found.
 
-- [ ] **Step 3: Create the TypeScript adapter**
+- [x] **Step 3: Create the TypeScript adapter**
 
 Create `packages/validators/src/adapters/typescript.ts`:
 
@@ -942,7 +942,7 @@ function parseTscOutput(
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -950,7 +950,7 @@ pnpm --filter @amase/validators test
 
 Expected: all TypeScript adapter tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/adapters/typescript.ts packages/validators/tests/adapters/typescript.test.ts
@@ -964,7 +964,7 @@ git commit -m "feat(validators): add TypeScript LangAdapter — reference implem
 **Files:**
 - Modify: `packages/validators/src/index.ts`
 
-- [ ] **Step 1: Update the validators index to export new types and register the TS adapter**
+- [x] **Step 1: Update the validators index to export new types and register the TS adapter**
 
 Replace the contents of `packages/validators/src/index.ts`:
 
@@ -992,7 +992,7 @@ adapterRegistry.register(typescriptAdapter);
 export { typescriptAdapter } from "./adapters/typescript.js";
 ```
 
-- [ ] **Step 2: Run full test suite to confirm no regressions**
+- [x] **Step 2: Run full test suite to confirm no regressions**
 
 ```bash
 pnpm test
@@ -1000,7 +1000,7 @@ pnpm test
 
 Expected: all tests across all packages pass.
 
-- [ ] **Step 3: Build all packages**
+- [x] **Step 3: Build all packages**
 
 ```bash
 pnpm build
@@ -1008,7 +1008,7 @@ pnpm build
 
 Expected: all 8 packages compile without errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/validators/src/index.ts
@@ -1019,7 +1019,7 @@ git commit -m "feat(validators): export LangAdapter types, register TypeScript a
 
 ## Task 8: Final smoke test
 
-- [ ] **Step 1: Run the MCP smoke script to confirm end-to-end still works**
+- [x] **Step 1: Run the MCP smoke script to confirm end-to-end still works**
 
 ```bash
 node scripts/mcp-smoke.mjs
@@ -1027,7 +1027,7 @@ node scripts/mcp-smoke.mjs
 
 Expected: `plan → execute → status → artifacts` completes in <5s without errors.
 
-- [ ] **Step 2: Run full test suite one final time**
+- [x] **Step 2: Run full test suite one final time**
 
 ```bash
 pnpm test
@@ -1035,7 +1035,7 @@ pnpm test
 
 Expected: all tests pass.
 
-- [ ] **Step 3: Final commit if any fixups were needed**
+- [x] **Step 3: Final commit if any fixups were needed**
 
 ```bash
 git add -p

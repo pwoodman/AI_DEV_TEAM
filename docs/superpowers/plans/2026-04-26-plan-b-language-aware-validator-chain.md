@@ -1,6 +1,6 @@
 # Plan B: Language-Aware Validator Chain — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the hardcoded TypeScript-only validator trio (lint, typecheck, unit-tests) with a language-aware `LangAdapterValidator` that dispatches to registered adapters based on file language, and add Python and Go as the second and third language implementations.
 
@@ -34,7 +34,7 @@
 - Modify: `packages/contracts/src/validation.ts`
 - Modify: `packages/contracts/tests/schemas.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `packages/contracts/tests/schemas.test.ts` inside the existing `describe("ValidationResult")` block:
 
@@ -45,7 +45,7 @@ it("accepts lang-adapter as a validator name", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to confirm it fails**
+- [x] **Step 2: Run the test to confirm it fails**
 
 ```bash
 pnpm --filter @amase/contracts test
@@ -53,7 +53,7 @@ pnpm --filter @amase/contracts test
 
 Expected: FAIL — `"lang-adapter"` not in enum.
 
-- [ ] **Step 3: Add "lang-adapter" to the enum**
+- [x] **Step 3: Add "lang-adapter" to the enum**
 
 In `packages/contracts/src/validation.ts`, replace the `ValidatorNameSchema` definition:
 
@@ -72,7 +72,7 @@ export const ValidatorNameSchema = z.enum([
 ]);
 ```
 
-- [ ] **Step 4: Run contracts tests**
+- [x] **Step 4: Run contracts tests**
 
 ```bash
 pnpm --filter @amase/contracts test
@@ -80,7 +80,7 @@ pnpm --filter @amase/contracts test
 
 Expected: all tests pass.
 
-- [ ] **Step 5: Rebuild contracts so downstream packages pick up the new type**
+- [x] **Step 5: Rebuild contracts so downstream packages pick up the new type**
 
 ```bash
 pnpm --filter @amase/contracts build
@@ -88,7 +88,7 @@ pnpm --filter @amase/contracts build
 
 Expected: clean build, no errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add packages/contracts/src/validation.ts packages/contracts/tests/schemas.test.ts
@@ -103,7 +103,7 @@ git commit -m "feat(contracts): add lang-adapter to ValidatorNameSchema"
 - Create: `packages/validators/src/lang-adapter-validator.ts`
 - Create: `packages/validators/tests/lang-adapter-validator.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/lang-adapter-validator.test.ts`:
 
@@ -242,7 +242,7 @@ describe("makeLangAdapterValidator", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -250,7 +250,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `makeLangAdapterValidator` not found.
 
-- [ ] **Step 3: Create lang-adapter-validator.ts**
+- [x] **Step 3: Create lang-adapter-validator.ts**
 
 Create `packages/validators/src/lang-adapter-validator.ts`:
 
@@ -310,7 +310,7 @@ export function makeLangAdapterValidator(registry: LangAdapterRegistry): Validat
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -318,7 +318,7 @@ pnpm --filter @amase/validators test
 
 Expected: all lang-adapter-validator tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/lang-adapter-validator.ts packages/validators/tests/lang-adapter-validator.test.ts
@@ -333,7 +333,7 @@ git commit -m "feat(validators): add makeLangAdapterValidator — language-aware
 - Create: `packages/validators/src/adapters/python.ts`
 - Create: `packages/validators/tests/adapters/python.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/adapters/python.test.ts`:
 
@@ -382,7 +382,7 @@ describe("pythonAdapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -390,7 +390,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `adapters/python.js` not found.
 
-- [ ] **Step 3: Create the Python adapter**
+- [x] **Step 3: Create the Python adapter**
 
 Create `packages/validators/src/adapters/python.ts`:
 
@@ -525,7 +525,7 @@ function parseMypyOutput(
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -533,7 +533,7 @@ pnpm --filter @amase/validators test
 
 Expected: all python adapter tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/adapters/python.ts packages/validators/tests/adapters/python.test.ts
@@ -548,7 +548,7 @@ git commit -m "feat(validators): add Python LangAdapter — ruff + mypy + pytest
 - Create: `packages/validators/src/adapters/go.ts`
 - Create: `packages/validators/tests/adapters/go.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `packages/validators/tests/adapters/go.test.ts`:
 
@@ -597,7 +597,7 @@ describe("goAdapter", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -605,7 +605,7 @@ pnpm --filter @amase/validators test
 
 Expected: FAIL — `adapters/go.js` not found.
 
-- [ ] **Step 3: Create the Go adapter**
+- [x] **Step 3: Create the Go adapter**
 
 Create `packages/validators/src/adapters/go.ts`:
 
@@ -741,7 +741,7 @@ function parseGoBuildOutput(
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -749,7 +749,7 @@ pnpm --filter @amase/validators test
 
 Expected: all go adapter tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/validators/src/adapters/go.ts packages/validators/tests/adapters/go.test.ts
@@ -763,7 +763,7 @@ git commit -m "feat(validators): add Go LangAdapter — golangci-lint + go build
 **Files:**
 - Modify: `packages/validators/src/index.ts`
 
-- [ ] **Step 1: Update validators/src/index.ts**
+- [x] **Step 1: Update validators/src/index.ts**
 
 Replace the contents of `packages/validators/src/index.ts`:
 
@@ -801,7 +801,7 @@ export { typescriptAdapter } from "./adapters/typescript.js";
 export const langAdapterValidator = makeLangAdapterValidator(adapterRegistry);
 ```
 
-- [ ] **Step 2: Run all validators tests**
+- [x] **Step 2: Run all validators tests**
 
 ```bash
 pnpm --filter @amase/validators test
@@ -809,7 +809,7 @@ pnpm --filter @amase/validators test
 
 Expected: all tests pass.
 
-- [ ] **Step 3: Typecheck validators**
+- [x] **Step 3: Typecheck validators**
 
 ```bash
 pnpm --filter @amase/validators typecheck
@@ -817,7 +817,7 @@ pnpm --filter @amase/validators typecheck
 
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/validators/src/index.ts
@@ -831,7 +831,7 @@ git commit -m "feat(validators): register python + go adapters; export langAdapt
 **Files:**
 - Modify: `packages/mcp-server/src/index.ts`
 
-- [ ] **Step 1: Update buildValidators() in mcp-server/src/index.ts**
+- [x] **Step 1: Update buildValidators() in mcp-server/src/index.ts**
 
 In `packages/mcp-server/src/index.ts`, update the imports and `buildValidators` function.
 
@@ -867,7 +867,7 @@ function buildValidators(): Validator[] {
 
 Note: `lintValidator`, `typecheckValidator`, and `unitTestsValidator` are removed from this chain — they are now handled internally by the TypeScript LangAdapter that `langAdapterValidator` dispatches to. Their exports remain for backwards compat.
 
-- [ ] **Step 2: Build the mcp-server package**
+- [x] **Step 2: Build the mcp-server package**
 
 ```bash
 pnpm --filter @amase/mcp-server build
@@ -875,7 +875,7 @@ pnpm --filter @amase/mcp-server build
 
 Expected: clean build, no TypeScript errors.
 
-- [ ] **Step 3: Run the full test suite**
+- [x] **Step 3: Run the full test suite**
 
 ```bash
 pnpm test
@@ -885,7 +885,7 @@ Expected: all tests pass. The bench adapter test (`packages/bench/tests/adapters
 
 If you see TypeScript errors about removed exports, check if any other file still imports `lintValidator`/`typecheckValidator`/`unitTestsValidator` from `@amase/validators` — those exports still exist so no import errors should appear.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add packages/mcp-server/src/index.ts
@@ -896,7 +896,7 @@ git commit -m "feat(mcp-server): replace hardcoded TS validators with langAdapte
 
 ## Task 7: Final smoke test
 
-- [ ] **Step 1: Run full build**
+- [x] **Step 1: Run full build**
 
 ```bash
 pnpm build
@@ -904,7 +904,7 @@ pnpm build
 
 Expected: all packages build cleanly.
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 ```bash
 pnpm test
@@ -912,7 +912,7 @@ pnpm test
 
 Expected: all tests pass (176+ tests, 0 failures).
 
-- [ ] **Step 3: Verify the bench adapter still runs end-to-end**
+- [x] **Step 3: Verify the bench adapter still runs end-to-end**
 
 ```bash
 pnpm --filter @amase/bench test
@@ -920,7 +920,7 @@ pnpm --filter @amase/bench test
 
 Expected: the `amase.test.ts` stub test completes and reports a `BenchResult` with `pass: false` (stub doesn't produce correct output — that's expected at this scope).
 
-- [ ] **Step 4: Final commit if any fixups were needed**
+- [x] **Step 4: Final commit if any fixups were needed**
 
 ```bash
 git add -p
