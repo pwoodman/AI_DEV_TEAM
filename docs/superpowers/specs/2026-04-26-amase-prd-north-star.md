@@ -1,7 +1,7 @@
 # AMASE North Star PRD — Deterministic MCP Layer for High-Performance AI Coding
 
 **Date:** 2026-04-26
-**Last updated:** 2026-04-29
+**Last updated:** 2026-04-29 (Plans E + F merged)
 **Status:** Approved — active north star
 
 ---
@@ -58,7 +58,7 @@ Language Detector        — deterministic, extension + shebang check        ✅
   ↓
 Task Router              — pure function, agent + context budget + validators ✅ done
   ↓
-Active Memory Injector   — pre-fetches ≤3 prior patterns from LanceDB       🔲 todo
+Active Memory Injector   — pre-fetches ≤3 prior patterns from LanceDB       ✅ done
   ↓
 Context Assembler        — file slices + schemas + memory, capped at budget  ✅ done
   ↓
@@ -66,9 +66,9 @@ Agent (LLM)              — plans only, emits patches
   ↓
 Validator Chain          — delegates to LangAdapter: lint → typecheck → test  ✅ done
   ↓
-Forward Risk Analyser    — dependency graph scan, regression check            🔲 todo
+Forward Risk Analyser    — dependency graph scan, regression check            ✅ done
   ↓
-Delta Generator          — structured patch + quality metadata output         🔲 todo
+Delta Generator          — structured patch + quality metadata output         ✅ done (quality.json)
 ```
 
 ### Component Status
@@ -92,11 +92,11 @@ Delta Generator          — structured patch + quality metadata output         
 | Gap metrics (parallelism, retry rate, cache-hit ratio, validator share) | ✅ done (Plan C) |
 | `amase-bench trace` CLI command | ✅ done (Plan C) |
 | Hard bench fixtures (fix-cascading-type-errors, split-god-module) | ✅ done (Plan C) |
-| `adapter: LangAdapter \| null` in RouteResult | 🔲 todo (Plan E) |
-| Active Memory Injector | 🔲 todo (Plan E) |
-| Forward Risk Analyser | 🔲 todo (Plan F) |
+| `adapter: LangAdapter \| null` in RouteResult | ✅ done (Plan E) |
+| Active Memory Injector | ✅ done (Plan E) |
+| Forward Risk Analyser | ✅ done (Plan F) |
 | 17 additional LangAdapters (Rust, Java, C#, C++, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, HTML/CSS, SQL, R, Lua + 2 more) | 🔲 todo (Plan G+) |
-| Structured delta output format | 🔲 todo (Plan F) |
+| Structured delta output format (quality.json) | ✅ done (Plan F) |
 
 ## 6. Language Adapter Layer
 
@@ -148,7 +148,7 @@ Language Detector reads file extensions in the workspace → returns `LangAdapte
 
 ## 7. Active Memory Injector
 
-**Status: 🔲 todo — LanceDB + embeddings infra exists; injector not wired**
+**Status: ✅ done (Plan E) — MemoryInjector wired into orchestrator; 200ms timeout race; fire-and-forget indexing**
 
 Runs at context assembly time, before any LLM call.
 
@@ -177,20 +177,9 @@ interface MemoryInjection {
 
 ## 8. Enhanced Task Router
 
-**Status: ✅ done — contextBudget + allowedValidators wired. `adapter` field pending.**
+**Status: ✅ done (Plans D + E) — contextBudget + allowedValidators + adapter all wired.**
 
-Current `RouteResult`:
-
-```ts
-interface RouteResult {
-  agent: AgentKind | "skip"
-  contextBudget: number               // max bytes for context envelope — ✅
-  allowedValidators: ValidatorName[]  // pruned to task kind — ✅
-  // adapter: LangAdapter | null      // 🔲 todo — needed for Plan E memory injection
-}
-```
-
-Target `RouteResult` (Plan E):
+`RouteResult`:
 
 ```ts
 interface RouteResult {
@@ -203,7 +192,7 @@ interface RouteResult {
 
 ## 9. Quality Gate — Forward Risk Analyser
 
-**Status: 🔲 todo (Plan F)**
+**Status: ✅ done (Plan F) — three-pass analysis (heuristic + AST caller-walk + adapter test run); HIGH triggers one retry**
 
 Final stage of the validator chain, runs after all existing validators pass.
 
@@ -227,7 +216,7 @@ Each finding tagged and included in delta output.
 
 ## 10. Delta Output Format
 
-**Status: 🔲 todo (Plan F)**
+**Status: ✅ done (Plan F) — quality.json written to workspace after each forward risk pass**
 
 ```yaml
 patch:
@@ -266,8 +255,8 @@ tokens_used: 812
 | B | Python + Go adapters, langAdapterValidator | ✅ merged |
 | C | Observability: decision-log v2, trace CLI, gap metrics, hard fixtures | ✅ merged |
 | D | Router: RouteResult, contextBudget, allowedValidators, mention-path filter | ✅ merged |
-| E | Active Memory Injector + `adapter` field in RouteResult | 🔲 next |
-| F | Forward Risk Analyser + structured delta output | 🔲 |
+| E | Active Memory Injector + `adapter` field in RouteResult | ✅ merged |
+| F | Forward Risk Analyser + structured delta output | ✅ merged |
 | G | Rust, Java, C# LangAdapters | 🔲 |
 | H | Remaining 14 LangAdapters | 🔲 |
 
