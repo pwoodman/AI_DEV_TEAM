@@ -27,6 +27,7 @@ import {
   type DAGStore,
   type DecisionLog,
   type LoggedDecision,
+  type MemoryInjector,
   runPaths,
   touchedPathsSignature,
 } from "@amase/memory";
@@ -216,6 +217,7 @@ export interface OrchestratorDeps {
   maxRetriesPerNode?: number;
   deploymentReadiness?: boolean;
   astIndex?: ASTIndex;
+  memoryInjector?: MemoryInjector;
 }
 
 export interface PlanResult {
@@ -736,6 +738,21 @@ export class Orchestrator {
           : routeResult.contextBudget;
         const files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
 
+        // Memory injection: prepend ≤3 prior patterns from LanceDB (≤150 tokens).
+        // No-ops silently if injector absent, key missing, or timeout fires.
+        const priorPatterns = this.deps.memoryInjector
+          ? await this.deps.memoryInjector.query(node.goal, effectiveContextPaths)
+          : [];
+        if (priorPatterns.length > 0) {
+          const memoryBlock = [
+            "--- Prior patterns (confidence ≥ 0.75) ---",
+            ...priorPatterns.map(
+              (p, i) => `${i + 1}. [${p.outcome}] "${p.summary}" (${p.confidence.toFixed(2)})`,
+            ),
+          ].join("\n");
+          files.unshift({ path: "__memory__", slice: memoryBlock });
+        }
+
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
         const cacheCheckpoint = getPartitionCache(nodePk);
@@ -845,6 +862,9 @@ export class Orchestrator {
           const diffSim = 0; // computed in bench adapter, record here if available
           recordPatchQuality(route, node.language, pass, diffSim);
 
+          // Fire-and-forget memory indexing — never blocks or throws.
+          this.deps.memoryInjector?.index(node.goal, effectiveContextPaths, true);
+
           // Apply patches (collision detection deferred to end of DAG)
           patchesByNode.push({ nodeId: node.id, patches: output.patches });
           debugLog("orchestrator.node.completed", { dagId, runId, nodeId: node.id, route, retries, patchCount: output.patches.length });
@@ -868,6 +888,7 @@ export class Orchestrator {
 
         lastFailureMessage = `validator ${outcome.firstFailure?.validator} failed: ${outcome.firstFailure?.issues.map((i) => i.message).join("; ")}`;
         debugLog("orchestrator.node.validatorFailed", { dagId, runId, nodeId: node.id, validator: outcome.firstFailure?.validator, retries });
+        this.deps.memoryInjector?.index(node.goal, effectiveContextPaths, false);
         retries += 1;
       }
 
