@@ -10,3 +10,6 @@ packages/bench/bench/
 .env.local
 .DS_Store
 coverage
+
+# git worktrees
+.claude/worktrees/
