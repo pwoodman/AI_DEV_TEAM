@@ -38,7 +38,6 @@ import {
   buildSkillChecksValidator,
 } from "@amase/validators";
 import { buildContextFiles } from "./context-builder.js";
-import { ContextAssembler } from "./context-assembler.js";
 import { type RouterOptions, routeNode } from "./router.js";
 import { applyPatches, ensureSandbox, seedSandbox } from "./sandbox.js";
 import { runScheduler } from "./scheduler.js";
@@ -735,13 +734,7 @@ export class Orchestrator {
         const budgetOverride = hasSlice
           ? routeResult.contextBudget + SYMBOL_CONTEXT_BUDGET
           : routeResult.contextBudget;
-        let files: Array<{ path: string; slice: string }>;
-        if ((process.env.AMASE_ROUTER_MODE ?? "baseline") === "option-b") {
-          const ca = new ContextAssembler();
-          files = await ca.build(paths.workspace, finalReadPaths, budgetOverride);
-        } else {
-          files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
-        }
+        const files = await buildContextFiles(paths.workspace, finalReadPaths, budgetOverride);
 
         // Get cache checkpoint for this (kind, skillIds) partition
         const nodePk = partitionKey(route, resolvedSkillIds);
