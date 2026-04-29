@@ -13,6 +13,7 @@ export * from "./language-detector.js";
 export * from "./lang-adapter-registry.js";
 export * from "./lang-adapter-validator.js";
 export * from "./spawn-command.js";
+export * from "./forward-risk.js";
 
 import { goAdapter } from "./adapters/go.js";
 import { pythonAdapter } from "./adapters/python.js";
