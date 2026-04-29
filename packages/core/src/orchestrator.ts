@@ -124,7 +124,7 @@ function isLiteEligible(goal: string): boolean {
 /** @internal */
 export function isSingleFilePath(paths: string[]): string | null {
   if (paths.length !== 1) return null;
-  const p = paths[0];
+  const p = paths[0]!;
   // Has a file extension (regex already excludes trailing-slash paths)
   if (/\.\w{1,6}$/.test(p)) return p;
   return null;
