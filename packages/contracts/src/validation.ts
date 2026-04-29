@@ -56,3 +56,19 @@ export const DecisionLogEntrySchema = z.object({
   data: z.record(z.unknown()).default({}),
 });
 export type DecisionLogEntry = z.infer<typeof DecisionLogEntrySchema>;
+
+export const RegressionRiskSchema = z.enum(["LOW", "MEDIUM", "HIGH"]);
+export type RegressionRisk = z.infer<typeof RegressionRiskSchema>;
+
+export const ForwardRiskSchema = z.object({
+  kind: z.enum(["api-shape", "schema", "perf-path"]),
+  file: z.string(),
+  detail: z.string(),
+});
+export type ForwardRisk = z.infer<typeof ForwardRiskSchema>;
+
+export const ForwardRiskResultSchema = z.object({
+  regressionRisk: RegressionRiskSchema,
+  forwardRisks: z.array(ForwardRiskSchema).default([]),
+});
+export type ForwardRiskResult = z.infer<typeof ForwardRiskResultSchema>;
