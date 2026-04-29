@@ -1,4 +1,6 @@
 import type { AgentKind, TaskNode, ValidatorName } from "@amase/contracts";
+import type { LangAdapter } from "@amase/validators";
+import { adapterRegistry } from "@amase/validators";
 
 export interface RouterOptions {
   skipFrontend?: boolean;
@@ -10,6 +12,7 @@ export interface RouteResult {
   agent: AgentKind | "skip";
   contextBudget: number;
   allowedValidators: ValidatorName[];
+  adapter: LangAdapter | null;
 }
 
 const CONTEXT_BUDGET_A: Partial<Record<AgentKind, number>> = {
@@ -58,12 +61,13 @@ export function routeNode(node: TaskNode, opts: RouterOptions = {}): RouteResult
   }
 
   if (agent === "skip") {
-    return { agent: "skip", contextBudget: 0, allowedValidators: [] };
+    return { agent: "skip", contextBudget: 0, allowedValidators: [], adapter: null };
   }
 
   return {
     agent,
     contextBudget: CONTEXT_BUDGET_A[agent] ?? 16_000,
     allowedValidators: validatorsForNode(agent, node.language),
+    adapter: adapterRegistry.getByLanguage(node.language ?? "") ?? null,
   };
 }
