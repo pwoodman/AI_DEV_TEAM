@@ -38,6 +38,7 @@ import {
   type ValidatorContext,
   buildDeploymentReadinessGate,
   buildSkillChecksValidator,
+  detectWorkspaceFramework,
 } from "@amase/validators";
 import { buildContextFiles } from "./context-builder.js";
 import { type RouterOptions, routeNode } from "./router.js";
@@ -629,6 +630,7 @@ export class Orchestrator {
     });
     const maxRetries = this.deps.maxRetriesPerNode ?? 2;
     const patchesByNode: Array<{ nodeId: string; patches: Patch[] }> = [];
+    const workspaceFramework = await detectWorkspaceFramework(graph.workspacePath);
     debugLog("orchestrator.execute.start", { dagId, runId, nodeCount: graph.nodes.length });
 
     const execute = async (node: TaskNode): Promise<"completed" | "failed" | "skipped"> => {
@@ -640,7 +642,12 @@ export class Orchestrator {
         event: "node.enqueued",
         data: { agentKind: node.kind, depsReady: node.dependsOn.length },
       });
-      const routeResult = routeNode(node, opts);
+      const effectiveNode =
+        workspaceFramework &&
+        (!node.language || node.language === "typescript" || node.language === "javascript")
+          ? { ...node, language: workspaceFramework }
+          : node;
+      const routeResult = routeNode(effectiveNode, opts);
       const route = routeResult.agent;
       if (route === "skip") {
         debugLog("orchestrator.node.skip", { dagId, runId, nodeId: node.id });
