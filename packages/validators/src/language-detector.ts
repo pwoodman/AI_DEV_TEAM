@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { extname } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 
 const EXT_MAP: Record<string, string> = {
   ".ts": "typescript",
@@ -81,4 +81,23 @@ export async function detectLanguages(files: string[]): Promise<string[]> {
     }
   }
   return [...detected];
+}
+
+const NEXT_CONFIGS = [
+  "next.config.js",
+  "next.config.ts",
+  "next.config.mjs",
+  "next.config.cjs",
+];
+
+export async function detectWorkspaceFramework(workspace: string): Promise<string | null> {
+  for (const config of NEXT_CONFIGS) {
+    try {
+      await access(join(workspace, config));
+      return "nextjs";
+    } catch {
+      // not found — try next
+    }
+  }
+  return null;
 }
