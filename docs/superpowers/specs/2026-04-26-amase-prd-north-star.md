@@ -95,7 +95,8 @@ Delta Generator          — structured patch + quality metadata output         
 | `adapter: LangAdapter \| null` in RouteResult | ✅ done (Plan E) |
 | Active Memory Injector | ✅ done (Plan E) |
 | Forward Risk Analyser | ✅ done (Plan F) |
-| 17 additional LangAdapters (Rust, Java, C#, C++, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, HTML/CSS, SQL, R, Lua + 2 more) | 🔲 todo (Plan G+) |
+| Rust, Java, C#, Next.js LangAdapters + Next.js workspace detection | ✅ done (Plan G) |
+| C++, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, HTML/CSS, SQL, R, Lua LangAdapters | 🔲 todo (Plan H+) |
 | Structured delta output format (quality.json) | ✅ done (Plan F) |
 
 ## 6. Language Adapter Layer
@@ -257,8 +258,8 @@ tokens_used: 812
 | D | Router: RouteResult, contextBudget, allowedValidators, mention-path filter | ✅ merged |
 | E | Active Memory Injector + `adapter` field in RouteResult | ✅ merged |
 | F | Forward Risk Analyser + structured delta output | ✅ merged |
-| G | Rust, Java, C# LangAdapters | 🔲 |
-| H | Remaining 14 LangAdapters | 🔲 |
+| G | Rust, Java, C#, Next.js LangAdapters + Next.js workspace detection | ✅ merged |
+| H | Remaining 12 LangAdapters (C++, PHP, Ruby, Swift, Kotlin, Dart, Scala, Shell, HTML/CSS, SQL, R, Lua) | 🔲 |
 
 ## 13. Enforcement Rules (Hard Constraints)
 
