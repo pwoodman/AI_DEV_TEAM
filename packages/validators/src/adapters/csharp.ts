@@ -1,0 +1,106 @@
+import type { ValidationResult } from "@amase/contracts";
+import type { LangAdapter } from "../lang-adapter.js";
+import { spawnCommand } from "../spawn-command.js";
+
+export const csharpAdapter: LangAdapter = {
+  language: "csharp",
+  extensions: [".cs"],
+
+  async lint(files: string[], workspace: string): Promise<ValidationResult> {
+    const start = Date.now();
+    if (files.length === 0) {
+      return { validator: "lint", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    const { code, stdout, stderr } = await spawnCommand(
+      "dotnet",
+      ["format", "--verify-no-changes"],
+      workspace,
+    );
+    if (code === 0) {
+      return { validator: "lint", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    return {
+      validator: "lint",
+      ok: false,
+      issues: [{ message: (stdout + stderr).slice(0, 1000), severity: "error" as const }],
+      durationMs: Date.now() - start,
+    };
+  },
+
+  async typecheck(files: string[], workspace: string): Promise<ValidationResult> {
+    const start = Date.now();
+    if (files.length === 0) {
+      return { validator: "typecheck", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    const { code, stdout, stderr } = await spawnCommand(
+      "dotnet",
+      ["build", "--no-incremental", "-q"],
+      workspace,
+    );
+    if (code === 0) {
+      return { validator: "typecheck", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    return {
+      validator: "typecheck",
+      ok: false,
+      issues: parseDotnetBuildOutput(stdout + stderr),
+      durationMs: Date.now() - start,
+    };
+  },
+
+  async format(files: string[], workspace: string): Promise<ValidationResult> {
+    const start = Date.now();
+    if (files.length === 0) {
+      return { validator: "lint", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    const { code, stdout, stderr } = await spawnCommand("dotnet", ["format"], workspace);
+    if (code === 0) {
+      return { validator: "lint", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    return {
+      validator: "lint",
+      ok: false,
+      issues: [{ message: (stdout + stderr).slice(0, 1000), severity: "error" as const }],
+      durationMs: Date.now() - start,
+    };
+  },
+
+  async test(files: string[], workspace: string): Promise<ValidationResult> {
+    const start = Date.now();
+    if (files.length === 0) {
+      return { validator: "unit-tests", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    const { code, stdout, stderr } = await spawnCommand(
+      "dotnet",
+      ["test", "--no-build", "--logger:console;verbosity=minimal"],
+      workspace,
+    );
+    if (code === 0) {
+      return { validator: "unit-tests", ok: true, issues: [], durationMs: Date.now() - start };
+    }
+    return {
+      validator: "unit-tests",
+      ok: false,
+      issues: [{ message: (stdout + stderr).slice(0, 2000), severity: "error" as const }],
+      durationMs: Date.now() - start,
+    };
+  },
+};
+
+function parseDotnetBuildOutput(
+  text: string,
+): Array<{ file?: string; line?: number; message: string; severity: "error" }> {
+  const issues: Array<{ file?: string; line?: number; message: string; severity: "error" }> = [];
+  for (const line of text.split(/\r?\n/)) {
+    // src/Foo.cs(10,5): error CS0103: message
+    const m = line.match(/^(.+?)\((\d+),\d+\):\s+error\s+\w+:\s+(.+)$/);
+    if (!m) continue;
+    const [, file, lineNo, message] = m;
+    if (!file || !lineNo || !message) continue;
+    issues.push({ file, line: Number(lineNo), message, severity: "error" });
+  }
+  if (issues.length === 0 && text.trim()) {
+    issues.push({ message: text.slice(0, 500), severity: "error" });
+  }
+  return issues;
+}
